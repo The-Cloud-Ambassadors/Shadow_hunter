@@ -1,27 +1,28 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from typing import List, Optional
 
 router = APIRouter()
 
-class Alert(BaseModel):
-    id: str
-    severity: str
-    description: str
-    timestamp: str
+# In-memory alert store (shared across the app)
+_alerts_store: List[dict] = []
 
-@router.get("/alerts", response_model=list[Alert])
+def add_alert(alert: dict):
+    """Called by the analyzer to push alerts."""
+    _alerts_store.append(alert)
+    # Keep last 100 alerts
+    if len(_alerts_store) > 100:
+        _alerts_store.pop(0)
+
+def get_alerts_store() -> List[dict]:
+    return _alerts_store
+
+@router.get("/alerts")
 async def get_alerts():
     """
-    Get active security alerts.
+    Get active security alerts from the live store.
     """
-    return [
-        Alert(
-            id="alert-101",
-            severity="HIGH",
-            description="Unauthorized outbound connection to unknown IP 10.0.0.5",
-            timestamp="2023-10-27T10:00:00Z"
-        )
-    ]
+    return _alerts_store
 
 @router.post("/scan")
 async def trigger_scan():

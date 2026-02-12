@@ -5,6 +5,7 @@ from pkg.core.interfaces import EventBroker, GraphStore
 from pkg.models.events import NetworkFlowEvent
 from services.analyzer.detector import AnomalyDetector
 from pkg.data.ai_domains import is_ai_domain
+from services.api.routers.policy import add_alert
 
 class AnalyzerEngine:
     """
@@ -15,6 +16,7 @@ class AnalyzerEngine:
         self.broker = broker
         self.graph = graph_store
         self.detector = AnomalyDetector()
+        self._event_count = 0
 
     async def start(self):
         logger.info("Analyzer Engine starting...")
@@ -22,7 +24,7 @@ class AnalyzerEngine:
         await self.broker.subscribe("sh.telemetry.traffic.v1", self.handle_traffic_event)
         logger.info("Subscribed to traffic events.")
 
-    async def handle_traffic_event(self, event_data:  Any):
+    async def handle_traffic_event(self, event_data: Any):
         try:
             # 1. Parse Event
             if isinstance(event_data, dict):
@@ -33,8 +35,11 @@ class AnalyzerEngine:
                 logger.error(f"Unknown event data type: {type(event_data)}")
                 return
 
+            self._event_count += 1
+            if self._event_count % 10 == 0:
+                logger.info(f"Analyzer processed {self._event_count} events")
+
             # 2. Enrich & Classify Nodes
-            # Determine Hostname from DPI metadata if available
             host = event.metadata.get("host") or event.metadata.get("sni") or event.metadata.get("dns_query")
             
             # --- Source Classification ---
@@ -47,7 +52,6 @@ class AnalyzerEngine:
             }
 
             # --- Destination Classification ---
-            # Default to IP
             dst_id = event.destination_ip
             dst_label = dst_id
             dst_type = "external" 
@@ -57,9 +61,8 @@ class AnalyzerEngine:
             
             # Override with Hostname if available (DPI)
             if host:
-                dst_id = host # Use domain as ID for graph clarity
+                dst_id = host
                 dst_label = host
-                # Check if it's a Shadow AI service
                 if is_ai_domain(host):
                     dst_type = "shadow"
                 elif not self.detector.is_internal(dst_id):
@@ -75,10 +78,11 @@ class AnalyzerEngine:
             await self.graph.add_node(src_id, ["Node"], src_props)
             await self.graph.add_node(dst_id, ["Node"], dst_props)
 
-            # Edge
+            # Edge — use .value to serialize Protocol enum to string
             relation = "TALKS_TO"
+            protocol_str = event.protocol.value if hasattr(event.protocol, 'value') else str(event.protocol)
             edge_props = {
-                "protocol": event.protocol,
+                "protocol": protocol_str,
                 "dst_port": event.destination_port,
                 "byte_count": event.bytes_sent + event.bytes_received,
                 "last_seen": event.timestamp.isoformat()
@@ -88,19 +92,18 @@ class AnalyzerEngine:
             # 4. Detect Anomalies & Alert
             is_anomalous, reason = self.detector.detect(event)
             if is_anomalous:
-                logger.warning(f"Anomaly Detected: {src_id} -> {dst_id} ({reason})")
+                logger.warning(f"🚨 ALERT: {src_id} -> {dst_id} ({reason})")
                 
-                # Publish Alert
                 alert = {
-                    "id": f"alert-{event.timestamp.timestamp()}",
+                    "id": f"alert-{event.timestamp.timestamp()}-{self._event_count}",
                     "severity": "HIGH",
                     "description": reason,
                     "source": src_id,
-                    "target": dst_label, # Use readable label
+                    "target": dst_label,
                     "timestamp": event.timestamp.isoformat()
                 }
-                # Publish to alerts topic
-                await self.broker.publish("sh.alerts.v1", alert)
+                # Push DIRECTLY to API alert store (guaranteed delivery)
+                add_alert(alert)
 
         except Exception as e:
             logger.error(f"Error handling event: {e}")
