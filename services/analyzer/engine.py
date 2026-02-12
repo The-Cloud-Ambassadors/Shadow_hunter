@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Dict, Any
 from loguru import logger
 from pkg.core.interfaces import EventBroker, GraphStore
@@ -7,22 +8,41 @@ from services.analyzer.detector import AnomalyDetector
 from pkg.data.ai_domains import is_ai_domain
 from services.api.routers.policy import add_alert
 
+# Check if intelligence module models exist
+MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "intelligence", "saved_models")
+ML_AVAILABLE = os.path.exists(os.path.join(MODELS_DIR, "classifier_model.joblib"))
+
+
 class AnalyzerEngine:
     """
     The "Brain" of Shadow Hunter.
-    Decoupled from infrastructure via EventBroker and GraphStore interfaces.
+    
+    Two analysis modes:
+    - Rule-based: AnomalyDetector (always active, fast)
+    - ML-powered: IntelligenceEngine (when trained models are available)
     """
-    def __init__(self, broker: EventBroker, graph_store: GraphStore):
+    def __init__(self, broker: EventBroker, graph_store: GraphStore, use_ml: bool = True):
         self.broker = broker
         self.graph = graph_store
         self.detector = AnomalyDetector()
         self._event_count = 0
+        
+        # ML Intelligence Engine (optional, enhances rule-based detection)
+        self.intel_engine = None
+        if use_ml and ML_AVAILABLE:
+            try:
+                from services.intelligence.engine import IntelligenceEngine
+                self.intel_engine = IntelligenceEngine()
+                self.intel_engine.load_models()
+                logger.info("🧠 ML Intelligence Engine loaded — enhanced detection active")
+            except Exception as e:
+                logger.warning(f"ML engine unavailable, using rule-based only: {e}")
 
     async def start(self):
         logger.info("Analyzer Engine starting...")
-        # Subscribe to traffic events
         await self.broker.subscribe("sh.telemetry.traffic.v1", self.handle_traffic_event)
-        logger.info("Subscribed to traffic events.")
+        mode = "ML + Rules" if self.intel_engine else "Rules Only"
+        logger.info(f"Analyzer subscribed ({mode}).")
 
     async def handle_traffic_event(self, event_data: Any):
         try:
@@ -42,7 +62,6 @@ class AnalyzerEngine:
             # 2. Enrich & Classify Nodes
             host = event.metadata.get("host") or event.metadata.get("sni") or event.metadata.get("dns_query")
             
-            # --- Source Classification ---
             src_id = event.source_ip
             src_type = "internal" if self.detector.is_internal(src_id) else "external"
             src_props = {
@@ -51,7 +70,6 @@ class AnalyzerEngine:
                 "last_seen": event.timestamp.isoformat()
             }
 
-            # --- Destination Classification ---
             dst_id = event.destination_ip
             dst_label = dst_id
             dst_type = "external" 
@@ -59,7 +77,6 @@ class AnalyzerEngine:
             if self.detector.is_internal(dst_id):
                 dst_type = "internal"
             
-            # Override with Hostname if available (DPI)
             if host:
                 dst_id = host
                 dst_label = host
@@ -78,8 +95,6 @@ class AnalyzerEngine:
             await self.graph.add_node(src_id, ["Node"], src_props)
             await self.graph.add_node(dst_id, ["Node"], dst_props)
 
-            # Edge — use .value to serialize Protocol enum to string
-            relation = "TALKS_TO"
             protocol_str = event.protocol.value if hasattr(event.protocol, 'value') else str(event.protocol)
             edge_props = {
                 "protocol": protocol_str,
@@ -87,22 +102,50 @@ class AnalyzerEngine:
                 "byte_count": event.bytes_sent + event.bytes_received,
                 "last_seen": event.timestamp.isoformat()
             }
-            await self.graph.add_edge(src_id, dst_id, relation, edge_props)
+            await self.graph.add_edge(src_id, dst_id, "TALKS_TO", edge_props)
 
-            # 4. Detect Anomalies & Alert
+            # 4. Detection — Rule-based (always runs)
             is_anomalous, reason = self.detector.detect(event)
+            severity = "HIGH"
+
+            # 5. ML Enhancement — Adds confidence + may catch things rules miss
+            ml_verdict = None
+            if self.intel_engine:
+                ml_verdict = self.intel_engine.analyze(event)
+                
+                # ML can override or enhance the rule-based verdict
+                if not is_anomalous and ml_verdict["classification"] == "shadow_ai" and ml_verdict["confidence"] > 0.7:
+                    is_anomalous = True
+                    reason = f"ML detected Shadow AI ({ml_verdict['confidence']:.0%} confidence)"
+                    severity = "HIGH"
+                elif not is_anomalous and ml_verdict["classification"] == "suspicious" and ml_verdict["confidence"] > 0.8:
+                    is_anomalous = True
+                    reason = f"ML flagged suspicious traffic ({ml_verdict['confidence']:.0%} confidence)"
+                    severity = "MEDIUM"
+                elif not is_anomalous and ml_verdict["is_anomalous"]:
+                    is_anomalous = True
+                    reason = f"Anomaly detected (score: {ml_verdict['anomaly_score']:.2f})"
+                    severity = "LOW"
+
+            # 6. Generate Alert
             if is_anomalous:
-                logger.warning(f"🚨 ALERT: {src_id} -> {dst_id} ({reason})")
+                logger.warning(f"🚨 ALERT [{severity}]: {src_id} -> {dst_id} ({reason})")
                 
                 alert = {
                     "id": f"alert-{event.timestamp.timestamp()}-{self._event_count}",
-                    "severity": "HIGH",
+                    "severity": severity,
                     "description": reason,
                     "source": src_id,
                     "target": dst_label,
                     "timestamp": event.timestamp.isoformat()
                 }
-                # Push DIRECTLY to API alert store (guaranteed delivery)
+                
+                # Add ML metadata if available
+                if ml_verdict:
+                    alert["ml_classification"] = ml_verdict["classification"]
+                    alert["ml_confidence"] = ml_verdict["confidence"]
+                    alert["ml_risk_score"] = ml_verdict["risk_score"]
+                
                 add_alert(alert)
 
         except Exception as e:

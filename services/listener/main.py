@@ -23,8 +23,8 @@ class ListenerService:
             from pkg.infra.local.broker import MemoryBroker
             self.broker = MemoryBroker() 
             
-        # Use broker.publish (adapter pattern) instead of raw producer
-        self.processor = PacketProcessor(self.broker.publish)
+        # Pass the broker so PacketProcessor can call broker.publish()
+        self.processor = PacketProcessor(self.broker)
         self.sniffer = None
 
     async def start(self):

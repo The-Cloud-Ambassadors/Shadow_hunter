@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from loguru import logger
 from pkg.models.events import NetworkFlowEvent, Protocol
