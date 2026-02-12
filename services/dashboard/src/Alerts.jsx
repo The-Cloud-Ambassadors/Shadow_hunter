@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { fetchAlerts } from "./api";
-import { AlertCircle, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ShieldAlert, XCircle, ArrowRight } from "lucide-react";
 
 const Alerts = () => {
   const [alerts, setAlerts] = useState([]);
@@ -17,43 +17,74 @@ const Alerts = () => {
   }, []);
 
   return (
-    <div className="bg-sh-panel rounded-lg border border-slate-700 h-full flex flex-col shadow-xl">
-      <div className="p-4 border-b border-slate-700 flex items-center gap-2">
-        <ShieldAlert className="text-sh-accent w-5 h-5" />
-        <h2 className="font-semibold text-slate-100">Security Alerts</h2>
+    <div className="h-full flex flex-col bg-sh-panel rounded-2xl border border-sh-border shadow-xl overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-sh-border bg-slate-900/50 backdrop-blur flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse" />
+          <span className="font-bold text-sm tracking-wider text-slate-200 uppercase">
+            Intel Feed
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+          LIVE
+        </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
         {alerts.length === 0 ? (
-          <div className="text-slate-500 text-sm text-center mt-10">
-            No active alerts
+          <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
+            <ShieldAlert className="w-12 h-12 mb-2 stroke-1" />
+            <span className="text-xs font-mono uppercase tracking-widest">
+              System Secure
+            </span>
           </div>
         ) : (
           alerts.map((alert) => (
             <div
               key={alert.id}
-              className="bg-slate-800/50 p-3 rounded border-l-4 border-red-500 hover:bg-slate-800 transition-colors"
+              className="group relative bg-slate-900/80 hover:bg-slate-800 p-3 rounded-lg border border-sh-border hover:border-slate-600 transition-all cursor-pointer"
             >
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-red-400 font-bold text-xs uppercase tracking-wider">
-                  {alert.severity}
-                </span>
-                <span className="text-slate-500 text-xs">
-                  {new Date(alert.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-              <p className="text-sm text-slate-200">{alert.description}</p>
-              {alert.source && alert.target && (
-                <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
-                  <span className="bg-slate-900 px-1 rounded">
-                    {alert.source}
+              {/* Severity Stripe */}
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${
+                  alert.severity === "HIGH"
+                    ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
+                    : "bg-amber-500"
+                }`}
+              ></div>
+
+              <div className="pl-3">
+                <div className="flex justify-between items-start mb-1">
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      alert.severity === "HIGH"
+                        ? "bg-red-950/50 text-red-500 border-red-500/30"
+                        : "bg-amber-950/50 text-amber-500 border-amber-500/30"
+                    }`}
+                  >
+                    {alert.severity}
                   </span>
-                  <span>→</span>
-                  <span className="bg-slate-900 px-1 rounded">
-                    {alert.target}
+                  <span className="text-[10px] font-mono text-slate-500">
+                    {new Date(alert.timestamp).toLocaleTimeString([], {
+                      hour12: false,
+                    })}
                   </span>
                 </div>
-              )}
+
+                <div className="text-xs text-slate-300 font-medium leading-relaxed mb-2">
+                  {alert.description}
+                </div>
+
+                {alert.source && (
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 bg-slate-950/50 p-1.5 rounded border border-slate-800/50">
+                    <span className="text-blue-400">{alert.source}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-600" />
+                    <span className="text-red-400">{alert.target}</span>
+                  </div>
+                )}
+              </div>
             </div>
           ))
         )}

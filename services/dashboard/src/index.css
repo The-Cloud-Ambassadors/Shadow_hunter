@@ -1,8 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+:root {
+  --color-sh-bg: #020617; /* Slate 950 */
+  --color-sh-panel: #0f172a; /* Slate 900 */
+  --color-sh-border: #1e293b; /* Slate 800 */
+  --color-sh-accent: #ef4444; /* Red 500 */
+}
+
+@theme {
+  --color-sh-bg: var(--color-sh-bg);
+  --color-sh-panel: var(--color-sh-panel);
+  --color-sh-border: var(--color-sh-border);
+  --color-sh-accent: var(--color-sh-accent);
+  --font-mono: "JetBrains Mono", monospace;
+}
 
 body {
-  background-color: #0f172a;
+  background-color: var(--color-sh-bg);
   color: #f8fafc;
+  overflow: hidden; /* Prevent global scrollbar */
 }
