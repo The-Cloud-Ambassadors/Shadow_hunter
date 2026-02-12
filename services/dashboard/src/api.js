@@ -9,6 +9,15 @@ export const apiClient = axios.create({
   },
 });
 
+export const fetchStatus = async () => {
+  try {
+    const res = await apiClient.get("/status");
+    return res.data;
+  } catch {
+    return { mode: "demo" };
+  }
+};
+
 export const fetchGraphData = async () => {
   try {
     const [nodesRes, edgesRes] = await Promise.all([
@@ -38,5 +47,35 @@ export const fetchAlerts = async () => {
   } catch (error) {
     console.error("Failed to fetch alerts:", error);
     return [];
+  }
+};
+
+export const fetchRiskScores = async () => {
+  try {
+    const res = await apiClient.get("/discovery/risk-scores");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch risk scores:", error);
+    return [];
+  }
+};
+
+export const fetchReport = async () => {
+  try {
+    const res = await apiClient.get("/policy/report");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to generate report:", error);
+    return null;
+  }
+};
+
+export const fetchTrafficStats = async () => {
+  try {
+    const res = await apiClient.get("/discovery/traffic-stats");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch traffic stats:", error);
+    return null;
   }
 };

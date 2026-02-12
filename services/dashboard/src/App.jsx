@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
 import GraphView from "./GraphView";
 import Alerts from "./Alerts";
-import { fetchGraphData, fetchAlerts } from "./api";
+import TrafficAnalytics from "./TrafficAnalytics";
+import {
+  fetchGraphData,
+  fetchAlerts,
+  fetchRiskScores,
+  fetchReport,
+  fetchStatus,
+} from "./api";
 import {
   Shield,
   Activity,
@@ -22,6 +29,9 @@ import {
   Monitor,
   Database,
   Radio,
+  TrendingUp,
+  Download,
+  BarChart2,
 } from "lucide-react";
 
 function App() {
@@ -35,6 +45,13 @@ function App() {
   });
   const [nodeList, setNodeList] = useState([]);
   const [alertCount, setAlertCount] = useState(0);
+  const [riskScores, setRiskScores] = useState([]);
+  const [isLiveMode, setIsLiveMode] = useState(false);
+
+  // Fetch system mode once on mount
+  useEffect(() => {
+    fetchStatus().then((s) => setIsLiveMode(s.mode === "live"));
+  }, []);
 
   // Real-time clock
   useEffect(() => {
@@ -45,9 +62,10 @@ function App() {
   // Fetch stats for all tabs
   useEffect(() => {
     const fetchStats = async () => {
-      const [graphData, alertsData] = await Promise.all([
+      const [graphData, alertsData, scores] = await Promise.all([
         fetchGraphData(),
         fetchAlerts(),
+        fetchRiskScores(),
       ]);
       const shadowNodes = graphData.nodes.filter(
         (n) => n.data.type === "shadow",
@@ -60,6 +78,7 @@ function App() {
       });
       setNodeList(graphData.nodes.map((n) => n.data));
       setAlertCount(alertsData.length);
+      setRiskScores(scores);
     };
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
@@ -119,8 +138,10 @@ function App() {
               </span>
             </h1>
             <div className="hidden md:flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-widest font-semibold ml-4 border-l border-slate-800 pl-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-              DEMO MODE
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${isLiveMode ? "bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]" : "bg-amber-500 animate-pulse"}`}
+              ></span>
+              {isLiveMode ? "LIVE MODE" : "DEMO MODE"}
             </div>
           </div>
 
@@ -147,46 +168,118 @@ function App() {
         {/* Content */}
         <main className="flex-1 overflow-hidden relative">
           {/* Background Grid */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:40px_40px] opacity-[0.04] pointer-events-none"></div>
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-size-[40px_40px] opacity-[0.04] pointer-events-none"></div>
 
           {/* Dashboard Tab */}
           {activeTab === "dashboard" && (
-            <div className="h-full flex p-3 gap-3">
-              {/* Graph */}
-              <div className="flex-1 h-full min-w-0 relative bg-sh-panel/30 border border-sh-border rounded-xl overflow-hidden">
-                <div className="absolute top-0 left-0 w-6 h-6 border-l-2 border-t-2 border-slate-700/50 rounded-tl-lg"></div>
-                <div className="absolute bottom-0 right-0 w-6 h-6 border-r-2 border-b-2 border-slate-700/50 rounded-br-lg"></div>
-                <GraphView />
-                {/* Floating Stats */}
-                <div className="absolute top-3 left-3 right-3 flex gap-3 pointer-events-none z-10">
-                  <StatCard
-                    label="NODES"
-                    value={stats.nodes}
-                    icon={<Monitor className="text-blue-400" />}
-                  />
-                  <StatCard
-                    label="CONNECTIONS"
-                    value={stats.edges}
-                    icon={<Activity className="text-cyan-400" />}
-                  />
-                  <StatCard
-                    label="THREATS"
-                    value={stats.shadowCount}
-                    icon={<AlertTriangle className="text-red-400" />}
-                    borderColor="border-red-500/30"
-                  />
+            <div className="h-full flex flex-col p-3 gap-3">
+              <div className="flex-1 flex gap-3 min-h-0">
+                {/* Graph */}
+                <div className="flex-1 h-full min-w-0 relative bg-sh-panel/30 border border-sh-border rounded-xl overflow-hidden">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-l-2 border-t-2 border-slate-700/50 rounded-tl-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-r-2 border-b-2 border-slate-700/50 rounded-br-lg"></div>
+                  <GraphView />
+                  {/* Floating Stats */}
+                  <div className="absolute top-3 left-3 right-3 flex gap-3 pointer-events-none z-10">
+                    <StatCard
+                      label="NODES"
+                      value={stats.nodes}
+                      icon={<Monitor className="text-blue-400" />}
+                    />
+                    <StatCard
+                      label="CONNECTIONS"
+                      value={stats.edges}
+                      icon={<Activity className="text-cyan-400" />}
+                    />
+                    <StatCard
+                      label="THREATS"
+                      value={stats.shadowCount}
+                      icon={<AlertTriangle className="text-red-400" />}
+                      borderColor="border-red-500/30"
+                    />
+                  </div>
+                </div>
+                {/* Alerts Panel */}
+                <div className="w-[360px] flex-none flex flex-col gap-3">
+                  <Alerts />
                 </div>
               </div>
-              {/* Alerts Panel */}
-              <div className="w-[360px] flex-none">
-                <Alerts />
-              </div>
+              {/* Bottom Row: Top Offenders */}
+              {riskScores.length > 0 && (
+                <div className="h-[140px] flex-none bg-sh-panel border border-sh-border rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-sh-border bg-slate-900/50">
+                    <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                      <TrendingUp size={12} className="text-amber-400" />
+                      Top Offenders
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-600">
+                      Risk Score
+                    </span>
+                  </div>
+                  <div className="flex gap-0 h-[calc(100%-36px)] divide-x divide-sh-border/50 overflow-x-auto custom-scrollbar">
+                    {riskScores.slice(0, 6).map((r, i) => (
+                      <div
+                        key={r.ip}
+                        className="flex-1 min-w-[140px] flex flex-col items-center justify-center p-2 hover:bg-slate-800/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className={`text-xs font-mono font-bold ${
+                              i === 0
+                                ? "text-red-400"
+                                : i === 1
+                                  ? "text-amber-400"
+                                  : "text-slate-300"
+                            }`}
+                          >
+                            #{i + 1}
+                          </span>
+                        </div>
+                        <div
+                          className="text-[11px] font-mono text-slate-300 truncate max-w-[120px]"
+                          title={r.ip}
+                        >
+                          {r.ip}
+                        </div>
+                        <div className="w-full mt-1.5 bg-slate-800 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full transition-all ${
+                              r.risk_pct > 70
+                                ? "bg-red-500"
+                                : r.risk_pct > 40
+                                  ? "bg-amber-500"
+                                  : "bg-blue-500"
+                            }`}
+                            style={{ width: `${r.risk_pct}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] font-mono text-slate-500">
+                            {r.total_alerts} alerts
+                          </span>
+                          <span
+                            className={`text-[9px] font-mono font-bold ${
+                              r.risk_pct > 70
+                                ? "text-red-400"
+                                : r.risk_pct > 40
+                                  ? "text-amber-400"
+                                  : "text-blue-400"
+                            }`}
+                          >
+                            {r.risk_pct}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
           {/* Network Tab */}
           {activeTab === "network" && (
-            <NetworkView nodes={nodeList} stats={stats} />
+            <NetworkTabView nodes={nodeList} stats={stats} />
           )}
 
           {/* Alerts Tab */}
@@ -203,6 +296,48 @@ function App() {
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════
+// Network Tab — Sub-tab switcher (Nodes / Analytics)
+// ═══════════════════════════════════════════════════════
+const NetworkTabView = ({ nodes, stats }) => {
+  const [subTab, setSubTab] = useState("nodes");
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Sub-tab bar */}
+      <div className="flex items-center gap-1 px-3 pt-2 pb-0">
+        {[
+          { key: "nodes", label: "Node Inventory", icon: <Server size={13} /> },
+          {
+            key: "analytics",
+            label: "Traffic Analytics",
+            icon: <BarChart2 size={13} />,
+          },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setSubTab(tab.key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-[11px] font-mono font-semibold uppercase tracking-wider transition-all ${
+              subTab === tab.key
+                ? "bg-sh-panel text-blue-400 border border-sh-border border-b-transparent"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      <div className="flex-1 min-h-0">
+        {subTab === "nodes" && <NetworkView nodes={nodes} stats={stats} />}
+        {subTab === "analytics" && <TrafficAnalytics />}
+      </div>
+    </div>
+  );
+};
 
 // ═══════════════════════════════════════════════════════
 // Network View — Full-screen node inventory
@@ -312,6 +447,29 @@ const NetworkView = ({ nodes, stats }) => {
 // Settings View
 // ═══════════════════════════════════════════════════════
 const SettingsView = () => {
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateReport = async () => {
+    setGenerating(true);
+    try {
+      const report = await fetchReport();
+      if (report) {
+        const blob = new Blob([JSON.stringify(report, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `shadow_hunter_report_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error("Report generation failed:", e);
+    }
+    setGenerating(false);
+  };
+
   return (
     <div className="h-full p-4 overflow-y-auto">
       <div className="max-w-2xl mx-auto space-y-4">
@@ -335,6 +493,11 @@ const SettingsView = () => {
             description="Detect large DNS payloads"
             defaultOn={true}
           />
+          <SettingRow
+            label="ML Intelligence Engine"
+            description="Enhanced detection via trained ML models"
+            defaultOn={true}
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Traffic Capture">
@@ -345,9 +508,8 @@ const SettingsView = () => {
           />
           <SettingRow
             label="Live Packet Capture"
-            description="Requires Npcap driver (not installed)"
+            description="Real-time network analysis via Npcap"
             defaultOn={false}
-            disabled={true}
           />
         </SettingsGroup>
 
@@ -364,6 +526,27 @@ const SettingsView = () => {
           />
         </SettingsGroup>
 
+        {/* Generate Report */}
+        <div className="bg-sh-panel border border-sh-border rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-sh-border bg-slate-900/50 text-xs font-mono font-bold text-slate-400 uppercase tracking-widest">
+            Report
+          </div>
+          <div className="p-4">
+            <p className="text-xs text-slate-500 mb-3">
+              Generate a comprehensive report of detected Shadow AI usage, alert
+              summaries, and risk scores.
+            </p>
+            <button
+              onClick={handleGenerateReport}
+              disabled={generating}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-mono font-bold uppercase tracking-wider hover:bg-blue-500/20 transition-all disabled:opacity-50"
+            >
+              <Download size={14} />
+              {generating ? "Generating..." : "Generate Report"}
+            </button>
+          </div>
+        </div>
+
         <div className="mt-8 p-4 bg-slate-900/50 border border-sh-border rounded-xl">
           <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">
             System Info
@@ -371,11 +554,11 @@ const SettingsView = () => {
           <div className="space-y-1 text-xs font-mono text-slate-400">
             <div className="flex justify-between">
               <span className="text-slate-500">Version</span>
-              <span>2.0.0-demo</span>
+              <span>2.0.0-ml</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Mode</span>
-              <span className="text-green-400">DEMO (Simulated)</span>
+              <span className="text-green-400">HYBRID (Rules + ML)</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Backend</span>
@@ -383,7 +566,11 @@ const SettingsView = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Npcap</span>
-              <span className="text-amber-400">Not Installed</span>
+              <span className="text-green-400">Installed ✓</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">ML Models</span>
+              <span className="text-green-400">Loaded ✓</span>
             </div>
           </div>
         </div>

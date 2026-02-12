@@ -15,7 +15,7 @@ from pkg.infra.local.broker import MemoryBroker
 from pkg.infra.local.store import NetworkXStore
 from services.analyzer.engine import AnalyzerEngine
 from services.listener.main import ListenerService
-from services.api.main import app as api_app
+from services.api.main import app as api_app, set_live_mode
 from services.api.dependencies import set_graph_store
 from services.listener.sniffer import SCAPY_AVAILABLE
 
@@ -25,6 +25,7 @@ LIVE_MODE = "--live" in sys.argv
 async def main():
     mode_label = "LIVE" if LIVE_MODE else "DEMO"
     logger.info(f"Starting Shadow Hunter in {mode_label} mode...")
+    set_live_mode(LIVE_MODE)
     
     # 1. Initialize Shared Infrastructure
     broker = MemoryBroker()

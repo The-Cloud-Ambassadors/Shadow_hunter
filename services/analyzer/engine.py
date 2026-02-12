@@ -110,7 +110,7 @@ class AnalyzerEngine:
 
             # 5. ML Enhancement — Adds confidence + may catch things rules miss
             ml_verdict = None
-            if self.intel_engine:
+            if self.intel_engine and not self.detector.is_whitelisted(event):
                 ml_verdict = self.intel_engine.analyze(event)
                 
                 # ML can override or enhance the rule-based verdict
