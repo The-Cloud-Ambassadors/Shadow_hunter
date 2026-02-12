@@ -1,0 +1,49 @@
+[project]
+name = "shadow-hunter"
+version = "0.1.0"
+description = "Autonomous Agentic Discovery of Hidden AI & Cloud Dependencies"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+  {name = "Shadow Hunter Team", email = "team@shadowhunter.ai"}
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "aiokafka>=0.11.0",
+    "neo4j>=5.25.0",
+    "torch>=2.4.0",
+    "scapy>=2.5.0",
+    "clickhouse-driver>=0.2.9",
+    "typer>=0.12.0",
+    "httpx>=0.27.0",
+    "loguru>=0.7.2",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "prometheus-client>=0.21.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    "black>=24.8.0"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

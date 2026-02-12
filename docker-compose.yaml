@@ -1,0 +1,38 @@
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    command:
+      - redpanda start
+      - --smp 1 
+      - --memory 1G 
+      - --reserve-memory 0M 
+      - --overprovisioned 
+      - --kafka-addr CODE://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr CODE://redpanda:9092,OUTSIDE://localhost:19092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - 19092:19092
+      - 9644:9644
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy|OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  listener:
+    build:
+      context: .
+      dockerfile: services/listener/Dockerfile
+    network_mode: host
+    environment:
+      - SH_KAFKA_BOOTSTRAP_SERVERS=localhost:19092
+      - SH_KAFKA_TOPIC=sh.telemetry.traffic.v1
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+volumes:
+  redpanda-data:

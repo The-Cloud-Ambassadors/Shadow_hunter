@@ -1,0 +1,39 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
+from contextlib import asynccontextmanager
+
+from services.api.routers import discovery, policy
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Control Plane API starting...")
+    yield
+    logger.info("Control Plane API shutting down...")
+
+app = FastAPI(
+    title="Shadow Hunter Control Plane",
+    version="0.1.0",
+    description="API for managing Shadow Hunter security platform",
+    lifespan=lifespan
+)
+
+# Enable CORS for dashboard
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(discovery.router, prefix="/v1/discovery", tags=["Discovery"])
+app.include_router(policy.router, prefix="/v1/policy", tags=["Policy"])
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "component": "control-plane"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
