@@ -139,6 +139,13 @@ class AnalyzerEngine:
                     "target": dst_label,
                     "timestamp": event.timestamp.isoformat()
                 }
+
+                # Broadcast to connected clients
+                from services.api.transceiver import manager
+                await manager.broadcast({
+                    "type": "alert",
+                    "payload": alert
+                })
                 
                 # Add ML metadata if available
                 if ml_verdict:

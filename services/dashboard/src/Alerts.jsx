@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { fetchAlerts } from "./api";
-import { AlertTriangle, ShieldAlert, XCircle, ArrowRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ShieldAlert,
+  XCircle,
+  ArrowRight,
+  Download,
+} from "lucide-react";
 
-const Alerts = () => {
+const Alerts = ({ searchQuery, onExport }) => {
   const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
@@ -16,6 +22,16 @@ const Alerts = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const filtered = alerts.filter((a) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.description?.toLowerCase().includes(q) ||
+      a.source?.toLowerCase().includes(q) ||
+      a.target?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="h-full flex flex-col bg-sh-panel rounded-2xl border border-sh-border shadow-xl overflow-hidden">
       {/* Header */}
@@ -26,22 +42,31 @@ const Alerts = () => {
             Intel Feed
           </span>
         </div>
-        <span className="text-[10px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-          LIVE
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onExport(filtered)}
+            className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700 hover:border-slate-500"
+          >
+            <Download size={10} />
+            CSV
+          </button>
+          <span className="text-[10px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+            LIVE
+          </span>
+        </div>
       </div>
 
       {/* List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-        {alerts.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
             <ShieldAlert className="w-12 h-12 mb-2 stroke-1" />
             <span className="text-xs font-mono uppercase tracking-widest">
-              System Secure
+              {searchQuery ? "No matches found" : "System Secure"}
             </span>
           </div>
         ) : (
-          alerts.map((alert) => (
+          filtered.map((alert) => (
             <div
               key={alert.id}
               className="group relative bg-slate-900/80 hover:bg-slate-800 p-3 rounded-lg border border-sh-border hover:border-slate-600 transition-all cursor-pointer"

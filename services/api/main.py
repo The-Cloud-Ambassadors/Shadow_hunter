@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from contextlib import asynccontextmanager
@@ -47,6 +47,16 @@ async def health_check():
 @app.get("/v1/status")
 async def system_status():
     return {"mode": "live" if _live_mode else "demo"}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    from services.api.transceiver import manager
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except Exception:
+        manager.disconnect(websocket)
 
 if __name__ == "__main__":
     import uvicorn

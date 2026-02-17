@@ -79,6 +79,8 @@ async def main():
         await server.serve()
     except asyncio.CancelledError:
         pass
+    except Exception as e:
+        logger.error(f"🔥 Error in server.serve(): {e}")
     finally:
         logger.info("Shutting down...")
         if simulator_task:
@@ -90,3 +92,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        logger.exception(f"CRITICAL ERROR: {e}")
+        sys.exit(1)

@@ -45,12 +45,34 @@ function App() {
   });
   const [nodeList, setNodeList] = useState([]);
   const [alertCount, setAlertCount] = useState(0);
+  const lastAlertCountRef = React.useRef(0); // Track for notifications to avoid stale closures
   const [riskScores, setRiskScores] = useState([]);
   const [isLiveMode, setIsLiveMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Helper: Download CSV
+  const downloadCSV = (data, filename) => {
+    const headers = Object.keys(data[0]);
+    const rows = data.map((row) =>
+      headers.map((header) => JSON.stringify(row[header] || "")).join(","),
+    );
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+  };
 
   // Fetch system mode once on mount
   useEffect(() => {
     fetchStatus().then((s) => setIsLiveMode(s.mode === "live"));
+
+    // Request notification permission
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
   }, []);
 
   // Real-time clock
@@ -59,9 +81,9 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch stats for all tabs
-  useEffect(() => {
-    const fetchStats = async () => {
+  // Fetch stats function (extracted for reuse)
+  const fetchStats = async () => {
+    try {
       const [graphData, alertsData, scores] = await Promise.all([
         fetchGraphData(),
         fetchAlerts(),
@@ -77,12 +99,82 @@ function App() {
         shadowCount: shadowNodes.length,
       });
       setNodeList(graphData.nodes.map((n) => n.data));
-      setAlertCount(alertsData.length);
       setRiskScores(scores);
-    };
+
+      // Notification check using Ref to avoid stale closure in WS callback
+      const currentCount = lastAlertCountRef.current;
+      if (alertsData.length > currentCount) {
+        const newAlerts = alertsData.slice(0, alertsData.length - currentCount);
+        const highSev = newAlerts.find((a) => a.severity === "HIGH");
+        if (highSev) {
+          // Play sound
+          const audio = new Audio("/alert.mp3");
+          audio.play().catch(() => {});
+
+          // Browser notification
+          if (
+            "Notification" in window &&
+            Notification.permission === "granted"
+          ) {
+            new Notification(`🚨 SHADOW HUNTER: ${highSev.message}`, {
+              body: `Source: ${highSev.source} → Target: ${highSev.target}`,
+              icon: "/favicon.ico",
+              tag: "shadow-hunter-alert",
+            });
+          }
+        }
+      }
+      setAlertCount(alertsData.length);
+      lastAlertCountRef.current = alertsData.length;
+    } catch (e) {
+      console.error("Failed to fetch stats:", e);
+    }
+  };
+
+  // WebSocket Connection
+  useEffect(() => {
+    // Initial fetch
     fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
+
+    let ws = null;
+    let reconnectTimeout = null;
+
+    const connect = () => {
+      ws = new WebSocket("ws://localhost:8000/ws");
+
+      ws.onopen = () => {
+        console.log("🟢 Connected to Real-Time Intelligence Feed");
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "alert") {
+          console.log("⚡ Real-time alert received");
+          fetchStats(); // Instant refresh
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error("WS Error:", e);
+      };
+
+      ws.onclose = () => {
+        console.log("🔴 Disconnected from Real-Time Feed. Reconnecting...");
+        ws = null;
+        reconnectTimeout = setTimeout(connect, 3000); // Try reconnecting in 3s
+      };
+    };
+
+    connect();
+
+    // Fallback polling (slower now, since we have WS)
+    const interval = setInterval(fetchStats, 10000);
+
+    return () => {
+      clearInterval(interval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+    };
   }, []);
 
   return (
@@ -151,6 +243,8 @@ function App() {
               <input
                 type="text"
                 placeholder="SEARCH..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-sh-panel border border-sh-border rounded-full py-1.5 pl-9 pr-4 text-xs font-mono w-56 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all text-slate-300 placeholder:text-slate-600"
               />
             </div>
@@ -279,13 +373,31 @@ function App() {
 
           {/* Network Tab */}
           {activeTab === "network" && (
-            <NetworkTabView nodes={nodeList} stats={stats} />
+            <NetworkTabView
+              nodes={nodeList}
+              stats={stats}
+              searchQuery={searchQuery}
+              onExport={() =>
+                downloadCSV(
+                  nodeList,
+                  `shadow_hunter_nodes_${new Date().toISOString().split("T")[0]}.csv`,
+                )
+              }
+            />
           )}
 
           {/* Alerts Tab */}
           {activeTab === "alerts" && (
             <div className="h-full p-3">
-              <Alerts />
+              <Alerts
+                searchQuery={searchQuery}
+                onExport={(data) =>
+                  downloadCSV(
+                    data,
+                    `shadow_hunter_alerts_${new Date().toISOString().split("T")[0]}.csv`,
+                  )
+                }
+              />
             </div>
           )}
 
@@ -300,7 +412,7 @@ function App() {
 // ═══════════════════════════════════════════════════════
 // Network Tab — Sub-tab switcher (Nodes / Analytics)
 // ═══════════════════════════════════════════════════════
-const NetworkTabView = ({ nodes, stats }) => {
+const NetworkTabView = ({ nodes, stats, searchQuery, onExport }) => {
   const [subTab, setSubTab] = useState("nodes");
 
   return (
@@ -332,7 +444,14 @@ const NetworkTabView = ({ nodes, stats }) => {
 
       {/* Sub-tab content */}
       <div className="flex-1 min-h-0">
-        {subTab === "nodes" && <NetworkView nodes={nodes} stats={stats} />}
+        {subTab === "nodes" && (
+          <NetworkView
+            nodes={nodes}
+            stats={stats}
+            searchQuery={searchQuery}
+            onExport={onExport}
+          />
+        )}
         {subTab === "analytics" && <TrafficAnalytics />}
       </div>
     </div>
@@ -342,9 +461,16 @@ const NetworkTabView = ({ nodes, stats }) => {
 // ═══════════════════════════════════════════════════════
 // Network View — Full-screen node inventory
 // ═══════════════════════════════════════════════════════
-const NetworkView = ({ nodes, stats }) => {
+const NetworkView = ({ nodes, stats, searchQuery, onExport }) => {
   const [filter, setFilter] = useState("all");
-  const filtered = nodes.filter((n) => filter === "all" || n.type === filter);
+  const filtered = nodes.filter((n) => {
+    const matchesType = filter === "all" || n.type === filter;
+    const matchesSearch =
+      !searchQuery ||
+      n.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.label && n.label.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesType && matchesSearch;
+  });
 
   return (
     <div className="h-full flex flex-col p-3 gap-3">
@@ -383,22 +509,31 @@ const NetworkView = ({ nodes, stats }) => {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex gap-2">
-        {["all", "internal", "external", "shadow"].map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-semibold uppercase tracking-wider transition-all ${
-              filter === f
-                ? f === "shadow"
-                  ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                  : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                : "bg-sh-panel text-slate-500 border border-sh-border hover:text-slate-300 hover:border-slate-600"
-            }`}
-          >
-            {f === "all" ? "All Nodes" : f}
-          </button>
-        ))}
+      <div className="flex gap-2 justify-between">
+        <div className="flex gap-2">
+          {["all", "internal", "external", "shadow"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-mono font-semibold uppercase tracking-wider transition-all ${
+                filter === f
+                  ? f === "shadow"
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                  : "bg-sh-panel text-slate-500 border border-sh-border hover:text-slate-300 hover:border-slate-600"
+              }`}
+            >
+              {f === "all" ? "All Nodes" : f}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onExport}
+          className="px-3 py-1.5 rounded-lg text-[11px] font-mono font-semibold uppercase tracking-wider bg-sh-panel text-slate-400 border border-sh-border hover:text-white hover:border-slate-500 flex items-center gap-2 transition-all"
+        >
+          <Download size={12} />
+          Export CSV
+        </button>
       </div>
 
       {/* Table */}

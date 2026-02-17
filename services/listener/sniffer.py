@@ -26,6 +26,12 @@ class PacketProcessor:
         self.producer = producer
         self.loop = asyncio.get_event_loop()
         self.packet_count = 0
+        if SCAPY_AVAILABLE:
+            from scapy.all import conf
+            logger.info(f"Using Scapy Interface: {conf.iface}")
+        if SCAPY_AVAILABLE:
+            from scapy.all import conf
+            logger.info(f"Using Scapy Interface: {conf.iface}")
 
     def process_packet_callback(self, packet: Packet):
         """
