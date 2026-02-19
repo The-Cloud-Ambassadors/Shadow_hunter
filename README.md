@@ -1,174 +1,152 @@
-# 🕵️‍♂️ Shadow Hunter
+# 🦅 Shadow Hunter
 
-**Real-Time Shadow AI Detection & Monitoring Platform**
+**Active Defense AI for Shadow IT & Lateral Movement**
 
-> **What is Shadow AI?**  
-> "Shadow AI" refers to the unsanctioned use of generative AI tools (ChatGPT, Claude, Copilot, etc.) by employees. While it boosts productivity, it introduces critical risks: **Data Exfiltration** (PII/Secrets), **Compliance Violations** (GDPR/HIPAA), and **Intellectual Property Leakage**.
-
-**Shadow Hunter** is an enterprise-grade network monitoring solution designed to detect, visualize, and manage Shadow AI usage in real-time. It operates passively, analyzing network traffic to identify AI service connections without requiring invasive endpoint agents.
+> **🚨 The Problem:** Traditional firewalls see "HTTPS traffic" to an unknown IP. They ignore it.  
+> **🛡️ The Solution:** Shadow Hunter acts as an **Active Sensor**. It detects, investigates, and neutralizes Shadow AI usage and lateral movement in real-time.
 
 ---
 
-## 🚀 Key Features
+## 📺 Demo
 
-- **Hybrid Monitoring Engine**:
-  - **Live Mode**: Captures real network traffic using `Npcap` / `Scapy`.
-  - **Demo Mode**: Simulates realistic enterprise traffic with 5 distinct employee personas.
-- **Dual-Layer Detection**:
-  - **Rule-Based**: Instant identification of **100+ AI domains** (OpenAI, Anthropic, HuggingFace, etc.) via a curated whitelist.
-  - **ML-Powered Anomaly Detection**: Isolation Forest & Random Forest models detect **unknown** or **encrypted** AI traffic anomalies rooted in packet behavior (size, frequency, duration).
-- **Intelligent Whitelisting**: Automatically filters out noise (Multicast, mDNS, UPnP, Internal-to-Internal) to focus on genuine external threats.
-- **Real-Time Visualization**:
-  - Interactive **Force-Directed Graph** of your network's AI footprint.
-  - **Traffic Analytics** breakdown (AI vs. Normal, Protocol Distribution).
-- **Actionable Intelligence**:
-  - **Risk Scoring** (0-100) for every internal IP.
-  - **Smart Alerts** enriched with AI Categories (LLM, Code Assistant, Image Gen).
-  - **Browser Notifications** for High-Severity incidents.
+[![Watch the capabilities of Shadow Hunter](https://img.shields.io/badge/Watch-Loom_Demo-blue?style=for-the-badge&logo=loom)](https://www.loom.com/share/YOUR_VIDEO_ID_HERE)
+
+_(Click to watch the 5-minute Consulting Pitch & Technical Walkthrough)_
+
+---
+
+## 📄 Product Abstract
+
+**Shadow Hunter** is an enterprise-grade Active Defense System designed to combat the rising threat of **Shadow AI**—the unsanctioned use of GenAI tools by employees. Unlike passive monitoring solutions that rely on outdated blocklists, Shadow Hunter employs a **Multi-Layer AI Engine** to detect encrypted AI traffic patterns (size, timing, frequency) in real-time.
+
+Upon detection, the system transitions from passive observer to **Active Hunter**, launching probing mechanisms to cryptographically verify the destination (JA3 Fingerprinting) and the service type (Active Interrogation). This allows organizations to prevent data exfiltration and intellectual property leakage without hindering legitimate productivity.
+
+---
+
+## 💡 Innovativeness
+
+1.  **Active Defense, Not Just Monitoring:** Most tools just log alerts. Shadow Hunter **interrogates** the suspect. If a connection looks like an AI API, we send a harmless probe (`HTTP OPTIONS`) to confirm it, generating high-fidelity alerts with zero false positives.
+2.  **JA3 Identity Verification:** We don't trust `User-Agent` headers. We fingerprint the **TLS Handshake** itself. If a script creates a connection but claims to be "Google Chrome," our JA3 matcher detects the spoof instantly.
+3.  **Graph-Based Lateral Movement Detection:** We visualize the network as a real-time **Force-Directed Graph**. By calculating **Betweenness Centrality**, we identify internal nodes acting as "bridges" or pivot points for attackers, a technique often missed by standard SIEMs.
+
+---
+
+## 🌍 Impact
+
+- **Security:** Prevents the leakage of PII, API keys, and proprietary code to public LLMs (ChatGPT, Claude, etc.).
+- **Compliance:** Ensures adherence to GDPR, HIPAA, and SOC2 by enforcing strict data egress policies for AI tools.
+- **Visibility:** Transforms opaque network logs into a living, breathing **3D map** of the organization's digital footprint, empowering C-suite executives with immediate situational awareness.
+
+---
+
+## 🚀 Key Capabilities
+
+### 1. 🧠 Multi-Layer AI Engine
+
+We don't rely on simple blocklists. Our analysis pipeline uses three distinct models:
+
+- **Isolation Forest**: Detects statistical anomalies in packet timing and size.
+- **Random Forest**: Classifies traffic into `Normal`, `Suspicious`, or `Shadow_AI`.
+- **Deep Autoencoder**: Reconstructs traffic patterns to flag zero-day deviations.
+
+### 2. 🕵️‍♂️ Active Defense (The "Hunter")
+
+- **JA3 Fingerprinting**: Identifies the client software. If a script pretends to be Chrome, we catch it.
+- **Active Interrogation**: Sends harmless probes (`HTTP OPTIONS`, `HEAD`) to the target IP to confirm if it's an AI service.
+
+### 3. ⚡ Auto-Remediation
+
+- **Dynamic Firewall**: Instantly blocks IPs with a "Critical" risk score.
+- **Smart Whitelisting**: Automatically ignores DNS, Gateways, and Multicast noise.
+
+---
+
+## 📚 Detailed Documentation
+
+For a **grain-to-grain** breakdown of the codebase, algorithms, and database schema, please refer to the **[Definitive User Guide](docs/Shadow_Hunter_Definitive_Guide.md)**.
 
 ---
 
 ## 🏗️ Architecture
 
-Shadow Hunter follows a modern, scalable data pipeline architecture designed for high-throughput network analysis.
+Shadow Hunter runs as a high-performance monolith for hackathons (`run_local.py`), but internally uses a microservices design:
 
 ```mermaid
-graph TB
-    subgraph Layer1 ["Layer 1: Traffic Collection"]
-        A["Enterprise Network"] -->|Packets/Flows| B("Traffic Sniffer / Simulator")
-        subgraph Sources
-            A1["User Devices"]
-            A2["Servers/VMs"]
-            A3["Kubernetes Clusters"]
-        end
-        A1 --> A
-        A2 --> A
-        A3 --> A
-    end
-
-    subgraph Layer2 ["Layer 2: Detection & Processing"]
-        B --> C{"Broker / Queue"}
-        C --> D["Shadow Hunter Analyzer"]
-
-        subgraph AnalyzerModules ["Analyzer Modules"]
-            D1["Protocol Decoder (DPI)"]
-            D2["Whitelisting Engine"]
-            D3["Rule Engine (AI Domains)"]
-            D4["ML Inference (Isolation Forest)"]
-        end
-
-        D --> D1
-        D1 --> D2
-        D2 --> D3
-        D3 --> D4
-        D --> E[("Graph Database")]
-    end
-
-    subgraph Layer3 ["Layer 3: Visualization & Response"]
-        D --> F["API Service (FastAPI)"]
-        F --> G["Web Dashboard (React)"]
-        F --> H["Alert System"]
-
-        subgraph DashboardViews ["Dashboard Views"]
-            G1["Live Graph"]
-            G2["Traffic Analytics"]
-            G3["Intel Feed"]
-        end
-
-        G --> G1
-        G --> G2
-        G --> G3
-    end
-
-    classDef layer fill:#f9f,stroke:#333,stroke-width:2px;
-    class A,B,C,D,E,F,G,H layer;
+graph LR
+    A[Sniffer] -->|Raw Packets| B(Event Broker)
+    B --> C{Analyzer Engine}
+    C -->|Feature vectors| D[AI Models]
+    C -->|Metadata| E[Graph Store]
+    C -->|Triggers| F[Active Defense]
+    F -->|Probe Results| C
+    C -->|Alerts| G[Dashboard]
+    C -->|Block Rules| H[Response Manager]
 ```
 
 ---
 
-## 🛠️ Installation & Setup
+## 🛠️ Quick Start
 
 ### Prerequisites
 
 - **Python 3.10+**
 - **Node.js 18+**
-- **Npcap** (Windows) or `libpcap` (Linux/Mac) for Live Mode capture.
+- **Npcap** (Windows) for Live Mode
 
-### 1. Clone & Install Dependencies
+### 1. Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/shadow-hunter.git
+git clone https://github.com/antigravity/shadow-hunter.git
 cd shadow-hunter
 
-# Install Python dependencies
+# Backend
 pip install -r requirements.txt
 
-# Install Frontend dependencies
+# Frontend
 cd services/dashboard
 npm install
-cd ../..
 ```
 
-### 2. Run the Platform
+### 2. Running the System
 
-You can run Shadow Hunter in two modes:
-
-#### 🅰️ Demo Mode (Simulation)
-
-Perfect for testing and demonstrations. Generates safe, simulated traffic.
+**Option A: Demo Mode (Recommended)**  
+Runs a simulation with 5 virtual employees generating realistic traffic.
 
 ```bash
-# Terminal 1: Backend
+# Terminal 1
 python run_local.py
 
-# Terminal 2: Frontend
-cd services/dashboard
-npm run dev
+# Terminal 2
+cd services/dashboard && npm run dev
 ```
 
-#### 🅱️ Live Mode (Real Capture)
-
-Monitors your actual network interface. **Requires Administrator privileges.**
+**Option B: Live Mode**  
+Monitors _your_ actual network interface.
 
 ```bash
-# Terminal 1: Backend (Run as Admin)
 python run_local.py --live
-
-# Terminal 2: Frontend
-cd services/dashboard
-npm run dev
 ```
 
 ---
 
 ## 📊 Dashboard Guide
 
-1.  **Dashboard Tab**: Shows the real-time **Network Graph**.
-    - Types: 🔵 Internal, 🟢 External (Safe), 🔴 Shadow AI.
-    - Click any node to see detailed connections.
-2.  **Network Tab**:
-    - **Node Inventory**: List of all discovered devices.
-    - **Traffic Analytics**: Charts showing protocol usage and top destinations.
-    - **Search**: Filter nodes by IP or name.
-    - **Export**: Download inventory as CSV.
-3.  **Alerts Tab**:
-    - Live feed of detected threats.
-    - **High Severity**: Known AI domains, Data Exfiltration > 50MB.
-    - **Medium/Low**: Suspicious ports, Anomalous traffic patterns.
-    - **Export**: Download alert history as CSV.
+| View       | Purpose                                                                               |
+| :--------- | :------------------------------------------------------------------------------------ |
+| **Graph**  | 3D visual of network topology. **Blue**=Internal, **Green**=External, **Red**=Threat. |
+| **Alerts** | Real-time feed of detected incidents with ML confidence scores.                       |
+| **Intel**  | Live logs from the Active Defense module (e.g., "Probing 1.2.3.4... Confirmed AI").   |
 
 ---
 
-## 🛡️ Technology Stack
+## 🛡️ Tech Stack
 
-- **Backend**: Python, FastAPI, Scapy (Packet Capture), Scikit-Learn (ML), NetworkX (Graph Theory).
-- **Frontend**: React, Vite, Tailwind CSS, Lucide Icons.
-- **Visualization**: Cytoscape.js (Graph), Recharts (Analytics).
-- **Deployment**: Docker (Optional), Local Process.
+- **Core**: Python 3.10, AsyncIO, Scapy
+- **ML**: Scikit-Learn (Isolation Forest), PyTorch/TensorFlow (Autoencoder)
+- **Graph**: NetworkX, 3D Force-Graph
+- **Web**: React 18, Vite, TailwindCSS, Lucide
+- **Protocol**: WebSockets for real-time streaming
 
 ---
 
-## ⚠️ Disclaimer
-
-_Shadow Hunter is a Proof-of-Concept (PoC) security tool. Ensure you have authorization before monitoring network traffic on any network you do not own._
+> _Built for the CA Hackathon 2026. Security meets Agentic AI._
