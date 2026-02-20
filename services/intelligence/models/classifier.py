@@ -35,14 +35,10 @@ class TrafficClassifier:
         self.label_encoder.fit(LABELS)
         self.is_trained = False
 
-        if SKLEARN_AVAILABLE:
-            self.model = RandomForestClassifier(
-                n_estimators=150,
-                max_depth=10,
-                min_samples_split=5,
-                random_state=42,
                 n_jobs=-1,
             )
+            self.explainer = None  # Lazy init
+
 
     def train(self, X: np.ndarray, y: list):
         """
@@ -61,14 +57,25 @@ class TrafficClassifier:
         self.model.fit(X, y_encoded)
         self.is_trained = True
 
-        # Log feature importances
-        from services.intelligence.features.extractor import FeatureExtractor
         importances = self.model.feature_importances_
         for name, imp in sorted(
             zip(FeatureExtractor.FEATURE_NAMES, importances),
             key=lambda x: x[1], reverse=True
         ):
             logger.info(f"  Feature '{name}': {imp:.4f}")
+
+        # Initialize SHAP explainer
+        try:
+            import shap
+            # Background dataset for TreeExplainer (optional but good for speed/accuracy)
+            # For RF, TreeExplainer is usually fast enough without background
+            self.explainer = shap.TreeExplainer(self.model)
+            logger.info("SHAP Explainer initialized.")
+        except ImportError:
+            logger.warning("SHAP not available despite training success.")
+        except Exception as e:
+            logger.error(f"Failed to init SHAP: {e}")
+
 
     def predict(self, X: np.ndarray) -> list:
         """
@@ -139,4 +146,68 @@ class TrafficClassifier:
             self.model = data["model"]
             self.label_encoder = data["encoder"]
             self.is_trained = True
+            
+            # Re-init explainer if possible
+            try:
+                import shap
+                self.explainer = shap.TreeExplainer(self.model)
+            except:
+                pass
+                
             logger.info(f"Classifier loaded from {path}")
+
+    def explain_prediction(self, X: np.ndarray, top_k=3) -> list:
+        """
+        Generate SHAP explanations for a prediction.
+        
+        Args:
+            X: Input features (1, D)
+            top_k: Number of top features to return
+            
+        Returns:
+            List of strings: ["FeatureX (+0.20)", "FeatureY (-0.10)"]
+        """
+        if not self.is_trained or not hasattr(self, "explainer") or self.explainer is None:
+            return []
+            
+        try:
+            from services.intelligence.features.extractor import FeatureExtractor
+            shap_values = self.explainer.shap_values(X)
+            
+            # shap_values is a list of arrays for each class [class0, class1, class2]
+            # We want to explain the predicted class (max prob)
+            # But efficiently, let's just use the max magnitude attribution across classes or specific class?
+            # Usually we explain the *predicted* class.
+            
+            pred_idx = self.model.predict(X)[0] # This returns class index if model is generic, but RF returns class label??
+            # sklearn RF predict returns class labels (encoded or not? fit with y_encoded)
+            # Wait, we trained with y_encoded. So predict returns integer.
+            
+            class_idx = int(pred_idx) # Should be 0, 1, or 2
+            
+            # Get values for the predicted class
+            # shap_values[class_idx] is shape (1, n_features)
+            vals = shap_values[class_idx][0]
+            
+            # Sort by absolute impact
+            feature_names = FeatureExtractor.FEATURE_NAMES
+            
+            # Check length match
+            if len(vals) != len(feature_names):
+                return []
+                
+            sorted_indices = np.argsort(np.abs(vals))[::-1]
+            
+            explanations = []
+            for i in range(min(top_k, len(vals))):
+                idx = sorted_indices[i]
+                val = vals[idx]
+                name = feature_names[idx]
+                sign = "+" if val > 0 else ""
+                explanations.append(f"{name} ({sign}{val:.2f})")
+                
+            return explanations
+        except Exception as e:
+            logger.error(f"SHAP explanation failed: {e}")
+            return []
+

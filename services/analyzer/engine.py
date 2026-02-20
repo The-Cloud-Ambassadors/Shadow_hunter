@@ -9,6 +9,7 @@ from services.analyzer.detector import AnomalyDetector
 from pkg.data.ai_domains import is_ai_domain
 from pkg.data.cidr_threat_intel import CIDRMatcher
 from pkg.data.ja3_intel import JA3Matcher
+from pkg.data.geoip import GeoIPService
 from services.active_defense.interrogator import ActiveProbe
 from services.graph.analytics import GraphAnalyzer
 from services.response.manager import ResponseManager
@@ -37,7 +38,9 @@ class AnalyzerEngine:
         self.detector = AnomalyDetector()
         self.cidr_matcher = CIDRMatcher()
         self.ja3_matcher = JA3Matcher()
+        self.geoip_service = GeoIPService()
         self.active_probe = ActiveProbe(enabled=active_defense)
+
         self.graph_analyzer = GraphAnalyzer(graph_store)
         self.response_manager = ResponseManager(enabled=active_defense)
         self._event_count = 0
@@ -100,11 +103,20 @@ class AnalyzerEngine:
                 elif not self.detector.is_internal(dst_id):
                      dst_type = "external"
 
+            # GeoIP Enrichment
+            geo_data = None
+            if dst_type in ("external", "shadow"):
+                 # Try to lookup IP even if host is known
+                 geo_data = self.geoip_service.lookup(event.destination_ip)
+            
             dst_props = {
                 "label": dst_label,
                 "type": dst_type,
-                "last_seen": event.timestamp.isoformat()
+                "last_seen": event.timestamp.isoformat(),
             }
+            if geo_data:
+                dst_props.update(geo_data)
+
 
             # 3. Update Graph — concurrent upserts for performance
             protocol_str = event.protocol.value if hasattr(event.protocol, 'value') else str(event.protocol)

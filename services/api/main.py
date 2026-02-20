@@ -42,10 +42,22 @@ app.add_middleware(
 app.include_router(discovery.router, prefix="/v1/discovery", tags=["Discovery"])
 app.include_router(policy.router, prefix="/v1/policy", tags=["Policy"])
 
+try:
+    from services.api.routers import chat
+    app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
+except ImportError as e:
+    logger.warning(f"Chat router not loaded: {e}")
+
+try:
+    from services.api.routers import reporting
+    app.include_router(reporting.router, prefix="/v1/reporting", tags=["Reporting"])
+except ImportError as e:
+    logger.warning(f"Reporting router not loaded: {e}")
+
 # ── API Key Authentication Middleware ──
 # Protects write operations. Read endpoints remain open.
 API_KEY = os.environ.get("SH_API_KEY", "shadow-hunter-dev")
-OPEN_PATHS = {"/health", "/ws", "/docs", "/openapi.json", "/redoc"}
+OPEN_PATHS = {"/health", "/ws", "/docs", "/openapi.json", "/redoc", "/v1/chat/query"}
 
 @app.middleware("http")
 async def api_key_auth(request: Request, call_next):

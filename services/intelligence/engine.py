@@ -153,6 +153,27 @@ class IntelligenceEngine:
                 f"p{ae_result['percentile']:.0f})"
             )
 
+                f"p{ae_result['percentile']:.0f})"
+            )
+
+        # 6. SHAP Explainability (High Risk Only)
+        if risk_score > 0.7 and self.classifier.is_trained:
+            try:
+                explanations = self.classifier.explain_prediction(features)
+                if explanations:
+                    reasons.append(f"Top Factors: {', '.join(explanations)}")
+            except Exception as e:
+                logger.error(f"Error generating SHAP explanation: {e}")
+
+        # 6. SHAP Explainability (High Risk Only)
+        if risk_score > 0.7 and self.classifier.is_trained:
+            try:
+                explanations = self.classifier.explain_prediction(features)
+                if explanations:
+                    reasons.append(f"Top Factors: {', '.join(explanations)}")
+            except Exception as e:
+                logger.error(f"Error generating SHAP explanation: {e}")
+
         return {
             "is_anomalous": is_anomalous or ae_anomalous,
             "anomaly_score": round(anomaly_score, 3),
@@ -162,6 +183,8 @@ class IntelligenceEngine:
             "reasons": reasons,
             "autoencoder": ae_result,
         }
+
+
 
     def analyze_session(self, src_ip: str) -> Dict[str, Any]:
         """Get behavioral analysis for a specific IP."""

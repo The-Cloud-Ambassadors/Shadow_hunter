@@ -286,6 +286,53 @@ function App() {
               />
             </div>
             <div className="text-right border-l border-sh-border pl-6 flex items-center gap-4">
+              {/* Hunter Chat Input */}
+              <div className="hidden lg:flex items-center gap-2">
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-xs">💬</span>
+                  </div>
+                  <input
+                    type="text"
+                    className="bg-sh-panel border border-sh-border text-slate-300 text-xs rounded-full focus:ring-blue-500 focus:border-blue-500 block w-64 pl-10 p-1.5 placeholder-slate-500 transition-all focus:w-80"
+                    placeholder='Ask Hunter: "Show high risk nodes..."'
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        const q = e.target.value;
+                        e.target.value = "Thinking...";
+                        e.target.disabled = true;
+                        try {
+                          const res = await fetch(
+                            "http://localhost:8000/v1/chat/query",
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ query: q }),
+                            },
+                          );
+                          const data = await res.json();
+                          alert(`🤖 HUNTER AI:\n\n${data.answer}`);
+                          if (data.action === "NAVIGATE") {
+                            setActiveTab(data.filter_params.tab);
+                          } else if (data.action === "FILTER_NODES") {
+                            setActiveTab("network");
+                            setSearchQuery(data.filter_params.type || "");
+                          } else if (data.action === "CLEAR_FILTERS") {
+                            setSearchQuery("");
+                          }
+                        } catch (err) {
+                          console.error("AI Error:", err);
+                          alert("AI Offline");
+                        }
+                        e.target.value = "";
+                        e.target.disabled = false;
+                        e.target.focus();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
@@ -599,7 +646,8 @@ const NetworkView = ({ nodes, stats, searchQuery, onExport }) => {
     const matchesSearch =
       !searchQuery ||
       n.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.label && n.label.toLowerCase().includes(searchQuery.toLowerCase()));
+      (n.label && n.label.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (n.type && n.type.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesType && matchesSearch;
   });
 

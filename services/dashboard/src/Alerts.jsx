@@ -294,6 +294,43 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                       </DetailSection>
                     )}
 
+                    {/* SHAP Explainability Section */}
+                    {(() => {
+                      const desc = alert.description || "";
+                      if (desc.includes("Top Factors:")) {
+                        const parts = desc.split("Top Factors:");
+                        const factors = parts[1]
+                          .split(",")
+                          .map((f) => f.trim());
+
+                        return (
+                          <DetailSection
+                            icon={<Zap size={11} className="text-yellow-400" />}
+                            title="AI Explainability (SHAP)"
+                          >
+                            <div className="mb-2 text-[11px] text-slate-400 italic">
+                              "Why did the model flag this?"
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {factors.map((factor, i) => {
+                                // Extract sign for color
+                                const isPositive = factor.includes("(+");
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`text-[10px] font-mono px-2 py-1 rounded border ${isPositive ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-blue-500/10 border-blue-500/30 text-blue-400"}`}
+                                  >
+                                    {factor}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </DetailSection>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     {/* Timestamp Details */}
                     <DetailSection icon={<Clock size={11} />} title="Timestamp">
                       <div className="text-[11px] font-mono text-slate-400">
