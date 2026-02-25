@@ -948,7 +948,7 @@ const StatCard = ({
   <div
     className={`bg-sh-panel/50 backdrop-blur-md border ${borderColor} rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg min-w-[140px] transition-all hover:scale-105 hover:bg-sh-panel/80 ${className}`}
   >
-    <div className="p-2 bg-slate-800/50 rounded-lg">
+    <div className="p-2 rounded-lg">
       {React.cloneElement(icon, { size: 18 })}
     </div>
     <div>
