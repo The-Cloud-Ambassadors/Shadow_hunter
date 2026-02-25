@@ -1,8 +1,5 @@
 # 🦅 Shadow Hunter: The Definitive Guide
 
-> **Version:** Final (Phase 6 Complete)
-> **Author:** Antigravity AI
-
 This document consolidates all project knowledge into a single source of truth. It covers architecture, usage, algorithms, and code structure "grain-to-grain".
 
 ---
