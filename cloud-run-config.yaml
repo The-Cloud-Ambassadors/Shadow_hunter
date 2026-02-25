@@ -1,0 +1,18 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: shadow-hunter-service
+spec:
+  template:
+    spec:
+      containerConcurrency: 80
+      containers:
+        - image: asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          env:
+            - name: ENV
+              value: production
+      timeoutSeconds: 300

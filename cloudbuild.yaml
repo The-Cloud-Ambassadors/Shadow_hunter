@@ -1,0 +1,15 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - '-t'
+      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
+
+images:
+  - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
