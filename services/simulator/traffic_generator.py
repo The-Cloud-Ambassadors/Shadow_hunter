@@ -10,6 +10,7 @@ import random
 from datetime import datetime
 from loguru import logger
 from pkg.models.events import NetworkFlowEvent, Protocol
+from pkg.data import idp_mock
 
 # Map AI domains to realistic IPs within known CIDR blocks
 # These IPs fall within the ranges defined in pkg.data.cidr_threat_intel
@@ -36,6 +37,7 @@ EMPLOYEES = [
         "name": "Dev_Ravi",
         "ip": "192.168.1.10",
         "role": "developer",
+        "department": "Engineering",
         "normal_sites": [
             "github.com", "stackoverflow.com", "npmjs.com", 
             "docs.python.org", "developer.mozilla.org", "pypi.org"
@@ -47,6 +49,7 @@ EMPLOYEES = [
         "name": "Designer_Priya",
         "ip": "192.168.1.11",
         "role": "designer",
+        "department": "Design",
         "normal_sites": [
             "figma.com", "dribbble.com", "behance.net",
             "fonts.google.com", "unsplash.com", "coolors.co"
@@ -58,6 +61,7 @@ EMPLOYEES = [
         "name": "Manager_Arjun",
         "ip": "192.168.1.12",
         "role": "manager",
+        "department": "Management",
         "normal_sites": [
             "mail.google.com", "calendar.google.com", "slack.com",
             "zoom.us", "docs.google.com", "notion.so"
@@ -69,6 +73,7 @@ EMPLOYEES = [
         "name": "DataSci_Meera",
         "ip": "192.168.1.13",
         "role": "data_scientist",
+        "department": "Data Science",
         "normal_sites": [
             "kaggle.com", "jupyter.org", "pandas.pydata.org",
             "scikit-learn.org", "arxiv.org", "paperswithcode.com"
@@ -80,6 +85,7 @@ EMPLOYEES = [
         "name": "Intern_Kiran",
         "ip": "192.168.1.14",
         "role": "intern",
+        "department": "Engineering",
         "normal_sites": [
             "google.com", "youtube.com", "reddit.com",
             "medium.com", "w3schools.com", "geeksforgeeks.org"
@@ -158,6 +164,15 @@ class TrafficGenerator:
             # AI requests tend to have larger payloads (sending prompts, receiving responses)
             await self._send_ai_traffic(emp["ip"], ai_service)
 
+    def _enrich_with_identity(self, event: NetworkFlowEvent) -> NetworkFlowEvent:
+        """Attach IdP identity data to an event based on its source IP."""
+        profile = idp_mock.resolve(event.source_ip)
+        if profile:
+            event.user_id = profile.user_id
+            event.user_name = profile.user_name
+            event.department = profile.department
+        return event
+
     async def _send_web_traffic(self, src_ip: str, domain: str):
         """Normal HTTPS web browsing."""
         event = NetworkFlowEvent(
@@ -168,8 +183,10 @@ class TrafficGenerator:
             protocol=Protocol.HTTPS,
             bytes_sent=random.randint(200, 3000),
             bytes_received=random.randint(5000, 50000),
+            duration_ms=random.uniform(50, 500),
             metadata={"host": domain, "sni": domain}
         )
+        event = self._enrich_with_identity(event)
         await self.broker.publish("sh.telemetry.traffic.v1", event)
 
     async def _send_internal_traffic(self, src_ip: str, server: dict):
@@ -181,8 +198,10 @@ class TrafficGenerator:
             destination_port=server["port"],
             protocol=Protocol.TCP,
             bytes_sent=random.randint(100, 2000),
+            duration_ms=random.uniform(5, 100),
             metadata={}
         )
+        event = self._enrich_with_identity(event)
         await self.broker.publish("sh.telemetry.traffic.v1", event)
 
     async def _send_ai_traffic(self, src_ip: str, ai_domain: str):
@@ -199,8 +218,10 @@ class TrafficGenerator:
             protocol=Protocol.HTTPS,
             bytes_sent=random.randint(5000, 80000),   # Large prompts
             bytes_received=random.randint(10000, 200000),  # Large responses
+            duration_ms=random.uniform(800, 5000),  # AI calls are slower
             metadata={"host": ai_domain, "sni": ai_domain}
         )
+        event = self._enrich_with_identity(event)
         await self.broker.publish("sh.telemetry.traffic.v1", event)
 
     async def _send_internal_server_traffic(self):

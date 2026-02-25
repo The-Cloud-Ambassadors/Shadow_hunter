@@ -20,8 +20,17 @@ class NetworkFlowEvent(BaseModel):
     protocol: Protocol
     bytes_sent: int = 0
     bytes_received: int = 0
+    duration_ms: float = 0.0
     payload_sample: Optional[str] = None # Base64 encoded or truncated text
     metadata: Dict[str, str] = Field(default_factory=dict)
+
+    # ── Identity Provider (IdP) enrichment fields ──
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
+    department: Optional[str] = None
+
+    # ── Quarantine / Kill-Switch status ──
+    quarantine_status: Optional[str] = None  # None | "active" | "released"
 
     class Config:
         populate_by_name = True

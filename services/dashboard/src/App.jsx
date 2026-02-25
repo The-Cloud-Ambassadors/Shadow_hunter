@@ -453,8 +453,13 @@ function App() {
                           className="text-[10px] font-mono text-slate-300 truncate max-w-[120px]"
                           title={r.ip}
                         >
-                          {r.ip}
+                          {r.user_name || r.ip}
                         </div>
+                        {r.department && (
+                          <div className="text-[8px] font-mono text-blue-400/70 truncate max-w-[120px]">
+                            {r.department}
+                          </div>
+                        )}
                         <div className="w-full mt-1 bg-slate-800 rounded-full h-1">
                           <div
                             className={`h-1 rounded-full transition-all ${

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchAlerts } from "./api";
+import { fetchAlerts, quarantineNode } from "./api";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -16,6 +16,7 @@ import {
   Crosshair,
   Zap,
   ExternalLink,
+  Lock,
 } from "lucide-react";
 
 const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
@@ -32,6 +33,21 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
     const interval = setInterval(loadAlerts, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleQuarantine = async (e, ip) => {
+    e.stopPropagation();
+    if (
+      window.confirm(
+        `⚠️ ACTIVE DEFENSE\n\nAre you sure you want to QUARANTINE node ${ip}?\nThis will trigger the kill-switch and isolate the node.`,
+      )
+    ) {
+      const res = await quarantineNode(
+        ip,
+        "Manual quarantine from Alerts panel",
+      );
+      if (res) alert(`✅ Node ${ip} quarantined successfully.`);
+    }
+  };
 
   const filtered = alerts.filter((a) => {
     if (!searchQuery) return true;
@@ -349,32 +365,43 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                       </div>
                     </DetailSection>
 
-                    {/* Source / Target Navigation */}
+                    {/* Navigation and Defense */}
                     {onNavigateToNode && (
                       <DetailSection
                         icon={<ExternalLink size={11} />}
-                        title="Navigate to Node"
+                        title="Actions & Navigation"
                       >
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToNode(alert.source);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            >
+                              <Zap size={10} />
+                              View Source
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToNode(alert.target);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            >
+                              <Crosshair size={10} />
+                              View Target
+                            </button>
+                          </div>
+
+                          {/* Kill Switch Button */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigateToNode(alert.source);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            onClick={(e) => handleQuarantine(e, alert.source)}
+                            className="w-full flex items-center justify-center gap-2 text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg py-2 px-2 transition-all uppercase tracking-widest mt-1"
                           >
-                            <Zap size={10} />
-                            Source
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigateToNode(alert.target);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg py-1.5 px-2 transition-all"
-                          >
-                            <Crosshair size={10} />
-                            Target
+                            <Lock size={12} className="animate-pulse" />
+                            Quarantine Source Node
                           </button>
                         </div>
                       </DetailSection>

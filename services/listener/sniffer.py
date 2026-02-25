@@ -14,6 +14,8 @@ import struct
 import time
 from loguru import logger
 from pkg.models.events import NetworkFlowEvent, Protocol
+from pkg.data import idp_mock
+from pkg.data.corporate_assets import should_capture
 
 # ── Robust Scapy Import ──
 SCAPY_AVAILABLE = False
@@ -329,7 +331,19 @@ class PacketProcessor:
             metadata=metadata
         )
 
+        # ── Privacy Mode: drop non-corporate traffic silently ──
+        if not should_capture(event.destination_ip, metadata):
+            return
+
+        # ── IdP Enrichment: attach human identity to the event ──
+        profile = idp_mock.resolve(event.source_ip)
+        if profile:
+            event.user_id = profile.user_id
+            event.user_name = profile.user_name
+            event.department = profile.department
+
         await self.producer.publish(
             os.getenv("SH_KAFKA_TOPIC", "sh.telemetry.traffic.v1"),
             event
         )
+
