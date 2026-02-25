@@ -1,0 +1,2 @@
+{"id": "evt-1772045790278", "timestamp": "2026-02-25T18:56:30.278164Z", "actor": "Security Analyst", "action": "QUARANTINE_NODE", "resource": "192.168.1.13", "details": {"reason": "Manual quarantine from Alerts panel", "threat_score": null, "trigger": "MANUAL"}}
+{"id": "evt-1772046152068", "timestamp": "2026-02-25T19:02:32.068033Z", "actor": "Security Analyst", "action": "QUARANTINE_NODE", "resource": "192.168.1.10", "details": {"reason": "Manual quarantine from Alerts panel", "threat_score": null, "trigger": "MANUAL"}}

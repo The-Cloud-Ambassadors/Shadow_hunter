@@ -123,6 +123,23 @@ async def delete_rule(rule_id: str):
     _policy_rules = [r for r in _policy_rules if r["id"] != rule_id]
     return {"status": "deleted", "id": rule_id}
 
+# ── SOAR Playbooks API ──
+@router.get("/soar/playbooks")
+async def get_soar_playbooks():
+    """Fetch active SOAR (Security Orchestration, Automation, and Response) playbooks."""
+    from services.intelligence.soar import soar_engine
+    
+    return [
+        {
+            "id": pb.id,
+            "name": pb.name,
+            "condition": pb.condition,
+            "action": pb.action,
+            "enabled": pb.enabled
+        }
+        for pb in soar_engine.playbooks
+    ]
+
 @router.get("/killchain")
 async def get_killchain():
     """
@@ -418,94 +435,38 @@ async def get_briefing():
 @router.get("/dlp")
 async def get_dlp_incidents():
     """
-    Analyze alerts for DLP-relevant incidents.
-    Detects potential data exfiltration to AI services.
+    Fetch real-time Data Loss Prevention (DLP) payload violations.
+    These are caught directly by the packet regex scanner.
     """
-    import re
     from datetime import datetime
 
     alerts = _alerts_store
     incidents = []
 
-    # DLP patterns to check
-    dlp_patterns = {
-        "pii_exposure": {
-            "label": "PII Exposure Risk",
-            "description": "Outbound traffic to AI service may contain personally identifiable information",
-            "severity": "HIGH",
-            "keywords": ["shadow ai", "chatgpt", "claude", "gemini", "perplexity"],
-        },
-        "api_key_leak": {
-            "label": "API Key Leak Risk",
-            "description": "Large outbound payload to AI coding assistant may contain API keys or credentials",
-            "severity": "HIGH",
-            "keywords": ["copilot", "cursor", "replit", "code ai"],
-        },
-        "data_exfiltration": {
-            "label": "Data Exfiltration",
-            "description": "Significant data volume transferred to external AI service",
-            "severity": "HIGH",
-            "keywords": [],
-        },
-        "code_snippet": {
-            "label": "Code Snippet Upload",
-            "description": "Source code may have been uploaded to AI coding tool",
-            "severity": "MEDIUM",
-            "keywords": ["copilot", "cursor", "replit", "code"],
-        },
-        "document_upload": {
-            "label": "Document Upload Risk",
-            "description": "Document content may have been shared with external AI service",
-            "severity": "MEDIUM",
-            "keywords": ["chatgpt", "claude", "gemini", "anthropic"],
-        },
-    }
-
     for alert in alerts:
-        desc = alert.get("description", "").lower()
-        target = alert.get("target", "").lower()
-        bytes_sent = alert.get("bytes_sent", 0) or 0
-        severity = alert.get("severity", "LOW")
+        snippets = alert.get("dlp_snippets", [])
+        if not snippets:
+            continue
 
-        matched_patterns = []
-
-        for pattern_id, pattern in dlp_patterns.items():
-            matched = False
-
-            # Check keywords
-            if pattern["keywords"]:
-                if any(kw in desc or kw in target for kw in pattern["keywords"]):
-                    matched = True
-
-            # Check data exfiltration by bytes
-            if pattern_id == "data_exfiltration" and bytes_sent > 5000:
-                if "shadow ai" in desc or severity == "HIGH":
-                    matched = True
-
-            if matched:
-                matched_patterns.append(pattern_id)
-
-        if matched_patterns:
-            primary = matched_patterns[0]
-            p = dlp_patterns[primary]
+        for snippet in snippets:
             incidents.append({
-                "id": f"dlp-{alert.get('id', 'unknown')}",
+                "id": f"dlp-{alert.get('id', 'unknown')}-{snippet.get('rule')}",
                 "alert_id": alert.get("id"),
-                "type": primary,
-                "label": p["label"],
-                "description": p["description"],
-                "severity": p["severity"],
+                "type": snippet.get("rule", "UNKNOWN"),
+                "label": snippet.get("rule", "Unknown Risk"),
+                "description": f"Detected sensitive data matching rule: {snippet.get('rule')}",
+                "severity": snippet.get("severity", "HIGH"),
                 "source": alert.get("source", "unknown"),
                 "target": alert.get("target", "unknown"),
-                "bytes_sent": bytes_sent,
+                "bytes_sent": alert.get("bytes_sent", 0),
                 "timestamp": alert.get("timestamp"),
-                "matched_patterns": matched_patterns,
+                "snippet": snippet.get("snippet", "**REDACTED**"),
                 "original_alert": alert.get("description", ""),
             })
 
     # Summary stats
     total = len(incidents)
-    high = sum(1 for i in incidents if i["severity"] == "HIGH")
+    high = sum(1 for i in incidents if i["severity"] in ("CRITICAL", "HIGH"))
     types = {}
     for i in incidents:
         types[i["type"]] = types.get(i["type"], 0) + 1

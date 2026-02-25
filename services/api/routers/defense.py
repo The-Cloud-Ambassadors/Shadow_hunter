@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from loguru import logger
+from pkg.infra.audit_store import audit_store
 
 router = APIRouter()
 
@@ -86,6 +87,18 @@ async def quarantine_node(req: QuarantineRequest):
         f"🛑 QUARANTINE [{trigger_type}]: Node {req.ip} isolated — "
         f"Reason: {req.reason} | Threat Score: {req.threat_score}"
     )
+    
+    # Write to immutable audit ledger
+    audit_store.append(
+        actor="Hunter ML Pipeline" if req.auto else "Security Analyst",
+        action="QUARANTINE_NODE",
+        resource=req.ip,
+        details={
+            "reason": req.reason,
+            "threat_score": req.threat_score,
+            "trigger": trigger_type
+        }
+    )
 
     return {
         "status": "quarantined",
@@ -114,6 +127,17 @@ async def release_node(req: ReleaseRequest):
         record["released_at"] = datetime.utcnow().isoformat()
 
     logger.info(f"✅ RELEASE: Node {req.ip} restored by {req.released_by}")
+
+    # Write to immutable audit ledger
+    audit_store.append(
+        actor=req.released_by,
+        action="RELEASE_NODE",
+        resource=req.ip,
+        details={
+            "reason": "Administrative override",
+            "previous_status": "quarantined"
+        }
+    )
 
     return {
         "status": "released",

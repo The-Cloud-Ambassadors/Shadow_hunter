@@ -66,6 +66,18 @@ try:
 except ImportError as e:
     logger.warning(f"Compliance router not loaded: {e}")
 
+try:
+    from services.api.routers import mitre
+    app.include_router(mitre.router, prefix="/v1/mitre", tags=["MITRE"])
+except ImportError as e:
+    logger.warning(f"MITRE router not loaded: {e}")
+
+try:
+    from services.api.routers import copilot
+    app.include_router(copilot.router, prefix="/v1/copilot", tags=["Copilot"])
+except ImportError as e:
+    logger.warning(f"Copilot router not loaded: {e}")
+
 # ── API Key Authentication Middleware ──
 # Protects write operations. Read endpoints remain open.
 API_KEY = os.environ.get("SH_API_KEY", "shadow-hunter-dev")

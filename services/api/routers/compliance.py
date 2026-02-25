@@ -16,6 +16,7 @@ from collections import Counter
 from services.api.dependencies import get_graph_store
 from services.api.routers.policy import get_alerts_store
 from pkg.core.interfaces import GraphStore
+from pkg.infra.audit_store import audit_store
 
 router = APIRouter()
 
@@ -197,29 +198,15 @@ async def compliance_violations():
 async def compliance_audit_log():
     """
     Generate a compliance audit log suitable for SOC 2 / ISO 27001 auditors.
+    Pulls from the immutable append-only ledger.
     """
-    alerts = get_alerts_store()
-
-    log_entries = []
-    for alert in alerts:
-        tags = _classify_alert_compliance(alert)
-        log_entries.append({
-            "event_id": f"SH-{hash(str(alert)) & 0xFFFFFF:06X}",
-            "timestamp": alert.get("timestamp", ""),
-            "event_type": "threat_intercepted",
-            "source": alert.get("source", ""),
-            "target": alert.get("destination", ""),
-            "severity": alert.get("severity", ""),
-            "action_taken": "blocked" if alert.get("severity") == "HIGH" else "flagged",
-            "compliance_controls": tags,
-            "details": alert.get("reason", ""),
-        })
+    logs = audit_store.get_logs(limit=200)
 
     return {
         "audit_period": {
-            "start": log_entries[0]["timestamp"] if log_entries else "",
-            "end": log_entries[-1]["timestamp"] if log_entries else "",
+            "start": logs[-1]["timestamp"] if logs else "",
+            "end": logs[0]["timestamp"] if logs else "",
         },
-        "total_events": len(log_entries),
-        "entries": list(reversed(log_entries[-100:])),  # Last 100, most recent first
+        "total_events": len(logs),
+        "entries": logs,
     }

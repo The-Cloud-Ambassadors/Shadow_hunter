@@ -9,6 +9,7 @@ import PolicyEngine from "./PolicyEngine";
 import DlpMonitor from "./DlpMonitor";
 import KillChain from "./KillChain";
 import ComplianceBoard from "./ComplianceBoard";
+import MitreMatrix from "./MitreMatrix";
 import ExecutiveBriefing from "./ExecutiveBriefing";
 import { generatePdfReport } from "./generatePdfReport";
 import {
@@ -237,6 +238,12 @@ function App() {
             active={activeTab === "killchain"}
             onClick={() => setActiveTab("killchain")}
             tooltip="Kill Chain"
+          />
+          <NavItem
+            icon={<Layers />}
+            active={activeTab === "mitre"}
+            onClick={() => setActiveTab("mitre")}
+            tooltip="MITRE ATT&CK Info"
           />
         </nav>
 
@@ -574,6 +581,12 @@ function App() {
           {activeTab === "killchain" && (
             <div className="h-full p-3">
               <KillChain />
+            </div>
+          )}
+
+          {activeTab === "mitre" && (
+            <div className="h-full">
+              <MitreMatrix />
             </div>
           )}
 

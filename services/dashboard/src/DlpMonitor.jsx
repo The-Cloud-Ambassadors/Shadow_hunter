@@ -219,6 +219,16 @@ const DlpMonitor = ({ searchQuery }) => {
                       )}
                     </div>
 
+                    {/* Render the actual intercepted and redacted snippet */}
+                    {inc.snippet && (
+                      <div className="mt-2 mb-2 p-2 bg-black/40 border border-red-500/20 rounded font-mono text-[10px] text-red-300 break-all">
+                        <span className="text-red-500/50 select-none mr-2">
+                          &gt;
+                        </span>
+                        {inc.snippet}
+                      </div>
+                    )}
+
                     {/* Original Alert + Timestamp */}
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] text-slate-600 truncate max-w-[60%]">

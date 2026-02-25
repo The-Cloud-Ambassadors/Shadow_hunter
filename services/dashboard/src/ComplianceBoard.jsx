@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchCompliance } from "./api";
+import { fetchCompliance, fetchComplianceAuditLog } from "./api";
 import {
   ShieldCheck,
   ShieldX,
@@ -7,6 +7,8 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  History,
+  Terminal,
 } from "lucide-react";
 
 const STATUS_STYLES = {
@@ -40,11 +42,16 @@ const ComplianceBoard = () => {
     summary: {},
   });
   const [expandedFw, setExpandedFw] = useState(null);
+  const [auditLog, setAuditLog] = useState([]);
 
   useEffect(() => {
     const load = async () => {
-      const result = await fetchCompliance();
-      if (result) setData(result);
+      const [compRes, auditRes] = await Promise.all([
+        fetchCompliance(),
+        fetchComplianceAuditLog(),
+      ]);
+      if (compRes) setData(compRes);
+      if (auditRes && auditRes.entries) setAuditLog(auditRes.entries);
     };
     load();
     const interval = setInterval(load, 10000);
@@ -244,6 +251,88 @@ const ComplianceBoard = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Immutable Audit Ledger */}
+      <div className="mt-6 border-t border-sh-border/50 pt-6">
+        <div className="flex items-center gap-2 mb-4">
+          <History size={14} className="text-blue-400" />
+          <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-widest">
+            Immutable Audit Ledger
+          </span>
+          <span className="text-[9px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded ml-auto">
+            WORM APPLIED
+          </span>
+        </div>
+
+        <div className="bg-sh-panel border border-sh-border rounded-xl overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-900/80 border-b border-sh-border text-[9px] font-mono text-slate-500 uppercase tracking-widest">
+                <th className="p-3 font-medium">Timestamp</th>
+                <th className="p-3 font-medium">Actor</th>
+                <th className="p-3 font-medium">Action</th>
+                <th className="p-3 font-medium">Resource</th>
+                <th className="p-3 font-medium">Details</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sh-border/50 text-[10px] font-mono">
+              {auditLog.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="p-6 text-center text-slate-600">
+                    <Terminal className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    No audit events recorded
+                  </td>
+                </tr>
+              ) : (
+                auditLog.slice(0, 15).map((log) => (
+                  <tr
+                    key={log.id}
+                    className="hover:bg-slate-800/30 transition-colors group"
+                  >
+                    <td className="p-3 text-slate-400 whitespace-nowrap">
+                      {new Date(log.timestamp).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                      })}
+                    </td>
+                    <td className="p-3 text-slate-300">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${log.actor.includes("System") || log.actor.includes("ML") ? "bg-purple-500" : "bg-blue-500"}`}
+                        ></span>
+                        {log.actor}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-1.5 py-0.5 rounded border ${
+                          log.action.includes("QUARANTINE")
+                            ? "bg-orange-500/10 text-orange-400 border-orange-500/30"
+                            : log.action.includes("RELEASE")
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                              : "bg-slate-800 text-slate-300 border-slate-700"
+                        }`}
+                      >
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-300 truncate max-w-[120px]">
+                      {log.resource}
+                    </td>
+                    <td className="p-3 text-slate-500 max-w-[200px] truncate group-hover:whitespace-normal group-hover:wrap-break-word transition-all duration-300">
+                      {log.details.reason || JSON.stringify(log.details)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

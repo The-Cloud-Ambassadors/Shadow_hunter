@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { fetchRules, createRule, toggleRule, deleteRule } from "./api";
+import {
+  fetchRules,
+  createRule,
+  toggleRule,
+  deleteRule,
+  fetchSoarPlaybooks,
+} from "./api";
 import {
   ShieldCheck,
   Plus,
@@ -10,6 +16,7 @@ import {
   Eye,
   Ban,
   X,
+  Zap,
 } from "lucide-react";
 
 const ACTION_STYLES = {
@@ -38,6 +45,7 @@ const ACTION_STYLES = {
 
 const PolicyEngine = () => {
   const [rules, setRules] = useState([]);
+  const [playbooks, setPlaybooks] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -51,6 +59,10 @@ const PolicyEngine = () => {
   const loadRules = async () => {
     const data = await fetchRules();
     if (data) setRules(data);
+
+    // Also load SOAR playbooks
+    const pbData = await fetchSoarPlaybooks();
+    if (pbData) setPlaybooks(pbData);
   };
 
   useEffect(() => {
@@ -113,6 +125,84 @@ const PolicyEngine = () => {
           {showForm ? <X size={10} /> : <Plus size={10} />}
           {showForm ? "Cancel" : "Add Rule"}
         </button>
+      </div>
+
+      {/* SOAR Playbooks Section */}
+      {playbooks.length > 0 && (
+        <div className="mb-6 space-y-2 relative">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={14} className="text-purple-400" />
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-widest">
+              Active SOAR Playbooks
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {playbooks.map((pb) => (
+              <div
+                key={pb.id}
+                className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-3 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 blur-xl rounded-full translate-x-1/2 -translate-y-1/2"></div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Zap
+                      size={12}
+                      className={
+                        pb.enabled ? "text-purple-400" : "text-slate-500"
+                      }
+                    />
+                    <span className="text-xs font-mono font-bold text-slate-200">
+                      {pb.name}
+                    </span>
+                  </div>
+                  <div
+                    className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${pb.enabled ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-400"}`}
+                  >
+                    {pb.enabled ? "ACTIVE" : "DISABLED"}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 mt-3">
+                  <div className="flex gap-2">
+                    <span className="text-[9px] font-mono text-slate-500 w-12 shrink-0 uppercase">
+                      IF
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(pb.condition).map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="text-[9px] font-mono text-slate-300 bg-slate-900 rounded px-1.5 py-0.5 border border-slate-700"
+                        >
+                          <span className="text-purple-400">{k}</span> =={" "}
+                          {Array.isArray(v) ? `[${v.join(",")}]` : v}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-[9px] font-mono text-slate-500 w-12 shrink-0 uppercase">
+                      THEN
+                    </span>
+                    <div className="text-[9px] font-mono text-slate-300 bg-slate-900 rounded px-1.5 py-0.5 border border-slate-700">
+                      <span className="text-red-400 uppercase font-bold">
+                        {pb.action}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Basic Rules Header */}
+      <div className="flex items-center gap-2 pt-2 border-t border-sh-border/50">
+        <Shield size={14} className="text-emerald-400" />
+        <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-widest">
+          Traffic Rules
+        </span>
       </div>
 
       {/* Add Rule Form */}

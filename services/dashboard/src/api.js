@@ -164,6 +164,16 @@ export const fetchDlpIncidents = async () => {
   }
 };
 
+export const fetchSoarPlaybooks = async () => {
+  try {
+    const res = await apiClient.get("/policy/soar/playbooks");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch SOAR playbooks:", error);
+    return [];
+  }
+};
+
 export const fetchKillchain = async () => {
   try {
     const res = await apiClient.get("/policy/killchain");
@@ -176,6 +186,17 @@ export const fetchKillchain = async () => {
       active_stages: 0,
       chain_completion: 0,
     };
+  }
+};
+
+// ── MITRE ATT&CK APIs ──────────────────────────────────────────────────
+export const fetchMitreMatrix = async () => {
+  try {
+    const res = await apiClient.get("/mitre/matrix");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch MITRE matrix:", error);
+    return { matrix: [], active_tactics: 0, total_mapped_alerts: 0 };
   }
 };
 

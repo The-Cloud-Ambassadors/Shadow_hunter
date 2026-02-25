@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -31,6 +31,10 @@ class NetworkFlowEvent(BaseModel):
 
     # ── Quarantine / Kill-Switch status ──
     quarantine_status: Optional[str] = None  # None | "active" | "released"
+
+    # ── DLP (Data Loss Prevention) ──
+    dlp_violation: bool = False
+    dlp_snippets: List[Dict[str, str]] = Field(default_factory=list)
 
     class Config:
         populate_by_name = True

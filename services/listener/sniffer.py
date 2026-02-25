@@ -16,6 +16,7 @@ from loguru import logger
 from pkg.models.events import NetworkFlowEvent, Protocol
 from pkg.data import idp_mock
 from pkg.data.corporate_assets import should_capture
+from pkg.plugins.dlp_engine import dlp_engine
 
 # ── Robust Scapy Import ──
 SCAPY_AVAILABLE = False
@@ -267,6 +268,7 @@ class PacketProcessor:
         dst_port = 0
         payload_len = 0
         metadata = {}
+        dlp_violations = []
 
         # 1. Determine L4 Protocol & Ports
         if packet.haslayer(TCP):
@@ -276,6 +278,13 @@ class PacketProcessor:
             dst_port = layer.dport
             payload = bytes(layer.payload)
             payload_len = len(payload)
+            
+            # Simple DLP scan on plaintext TCP payload
+            if payload_len > 0:
+                text_payload = payload.decode('utf-8', errors='ignore')
+                matches = dlp_engine.scan_payload(text_payload)
+                if matches:
+                    dlp_violations = [{"rule": m.rule_name, "severity": m.severity, "snippet": m.redacted_snippet} for m in matches]
 
             # 2. DPI: HTTP Host Header
             if dst_port == 80 and payload_len > 0:
@@ -328,7 +337,9 @@ class PacketProcessor:
             protocol=protocol,
             bytes_sent=payload_len,
             bytes_received=0,
-            metadata=metadata
+            metadata=metadata,
+            dlp_violation=len(dlp_violations) > 0,
+            dlp_snippets=dlp_violations
         )
 
         # ── Privacy Mode: drop non-corporate traffic silently ──

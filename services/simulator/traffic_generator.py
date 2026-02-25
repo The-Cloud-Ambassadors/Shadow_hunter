@@ -120,6 +120,11 @@ class TrafficGenerator:
         for emp in EMPLOYEES:
             logger.info(f"   • {emp['name']} ({emp['role']}) @ {emp['ip']}")
         
+        # --- INJECT MASTER DEMO SEQUENCE ON STARTUP ---
+        # This guarantees all Phase 1-6 features light up perfectly for the hackathon
+        await self._inject_master_demo_sequence()
+        logger.info("✅ Master Hackathon Demo Sequence Injected.")
+
         while self.running:
             try:
                 self.cycle += 1
@@ -141,6 +146,67 @@ class TrafficGenerator:
 
     async def stop(self):
         self.running = False
+
+    async def _inject_master_demo_sequence(self):
+        """
+        Forces a deterministic sequence of events to perfectly showcase all 
+        Phase 1-6 Enterprise Features for the hackathon without waiting.
+        """
+        logger.info("🎬 INJECTING MASTER DEMO SEQUENCE (Showcasing all Phase 1-6 features)")
+        
+        # 1. Phase 1 & 2: Graph Centrality & Lateral Movement
+        for server in INTERNAL_SERVERS:
+            event = NetworkFlowEvent(
+                source_ip="192.168.1.99",
+                source_port=random.randint(49152, 65535),
+                destination_ip=server["ip"],
+                destination_port=server["port"],
+                protocol=Protocol.TCP,
+                bytes_sent=random.randint(500, 2000),
+                metadata={"host": "Nmap-Scan"}
+            )
+            await self.broker.publish("sh.telemetry.traffic.v1", event)
+            await asyncio.sleep(0.1)
+
+        # 2. Phase 3 & 4: JA3 Fingerprinting & Active Interrogation
+        event = NetworkFlowEvent(
+            source_ip=EMPLOYEES[0]["ip"], # Dev_Ravi
+            source_port=random.randint(49152, 65535),
+            destination_ip="13.107.42.14", # ChatGPT
+            destination_port=443,
+            protocol=Protocol.HTTPS,
+            bytes_sent=85000,
+            bytes_received=2000,
+            metadata={
+                "host": "chatgpt.com", 
+                "sni": "chatgpt.com",
+                "ja3_hash": "b328a2b53bdccf4e3c852410a8bcd9f8", # Python requests
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" # Spoofed
+            }
+        )
+        event = self._enrich_with_identity(event)
+        await self.broker.publish("sh.telemetry.traffic.v1", event)
+        await asyncio.sleep(0.5)
+
+        # 3. Phase 5 & 6: Deep DLP, SOAR Auto-Quarantine, MITRE Mapping, Audit Logging
+        event = NetworkFlowEvent(
+            source_ip=EMPLOYEES[3]["ip"], # DataSci_Meera
+            source_port=random.randint(49152, 65535),
+            destination_ip="54.164.22.99", # Huggingface
+            destination_port=443,
+            protocol=Protocol.HTTPS,
+            bytes_sent=150000, 
+            metadata={"host": "huggingface.co"}
+        )
+        event = self._enrich_with_identity(event)
+        event.dlp_violation = True
+        event.dlp_snippets = [
+            {"rule": "AWS_ACCESS_KEY", "snippet": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"},
+            {"rule": "CREDIT_CARD", "snippet": "data={'payment': '4532 1122 3344 5566'}"}
+        ]
+        await self.broker.publish("sh.telemetry.traffic.v1", event)
+        await asyncio.sleep(1.0)
+
 
     async def _simulate_employee(self, emp: dict):
         """Simulate one employee's activity in a single cycle."""
