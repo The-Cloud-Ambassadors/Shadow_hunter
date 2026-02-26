@@ -1,362 +1,217 @@
-# 🦅 Shadow Hunter: The Definitive Guide
+# Shadow Hunter: The Definitive Guide
 
-This document consolidates all project knowledge into a single source of truth. It covers architecture, usage, algorithms, and code structure "grain-to-grain".
-
----
-
-## 📚 Table of Contents
-
-1.  [Philosophy & Goals](#1-philosophy--goals)
-2.  [System Architecture](#2-system-architecture)
-3.  [Feature Deep Dive (Active Defense)](#3-feature-deep-dive-active-defense)
-4.  [The AI Engine (Algorithms)](#4-the-ai-engine-algorithms)
-5.  [Codebase Reference (Grain-to-Grain)](#5-codebase-reference-grain-to-grain)
-6.  [Database Schema](#6-database-schema)
-7.  [API Reference](#7-api-reference)
-8.  [Demo Walkthrough Script](#8-demo-walkthrough-script)
-9.  [Setup & Troubleshooting](#9-setup--troubleshooting)
+This document serves as the comprehensive source of truth for the Shadow Hunter Active Defense System. It details the underlying philosophy, system architecture, active defense features, machine learning algorithms, and a grain-to-grain codebase map to assist developers, security engineers, and hackathon judges in understanding the platform.
 
 ---
 
-## 1. Philosophy & Goals
+## Table of Contents
 
-**Shadow Hunter** is an **Active Defense AI** designed to secure networks against advanced threats (Shadow AI, Lateral Movement) that evade signature-based firewalls.
-
-- **Passive vs. Active:** Traditional IDS watches. Shadow Hunter _hunts_ (probes suspicious IPs) and _acts_ (auto-blocking).
-- **Identity vs. Metadata:** We don't trust user-agents. We use **JA3 Fingerprinting** to cryptographically verify client identity.
-- **Graph vs. Logs:** Analyzing single packets is old school. We analyze the **Network Graph** to find bridges and pivots.
-
----
-
-## 2. System Architecture
-
-The system follows a microservices-inspired pipeline architecture, running as a monolithic process for ease of deployment (`run_local.py`).
-
-### Data Flow
-
-1.  **Listener (`sniffer.py`)**: Captures raw packets. Extracts JA3.
-2.  **Broker (`broker.py`)**: Async Pub/Sub bus. Decouples capture from analysis.
-3.  **Analyzer (`engine.py`)**: The Brain.
-    - **Enrichment**: Adds GeoIP/ASN.
-    - **Detection**: Runs ML + Rules + JA3.
-    - **Graph**: Updates `shadow_hunter.db`.
-4.  **Active Defense (`interrogator.py`)**: Probes high-risk external targets.
-5.  **Response (`manager.py`)**: Blocks CRITICAL threats.
-6.  **Dashboard**: Visualizes the live graph via WebSockets.
+1. [System Philosophy & Objectives](#1-system-philosophy--objectives)
+2. [Macro System Architecture](#2-macro-system-architecture)
+3. [Core Feature Deep Dive](#3-core-feature-deep-dive)
+4. [Machine Learning Engine](#4-machine-learning-engine)
+5. [Codebase Anatomy Map](#5-codebase-anatomy-map)
+6. [Database Schema](#6-database-schema)
+7. [API Reference](#7-api-reference)
+8. [Demo Walkthrough Script](#8-demo-walkthrough-script)
+9. [Setup & Deployment](#9-setup--deployment)
 
 ---
 
-## 3. Feature Deep Dive (Active Defense)
+## 1. System Philosophy & Objectives
 
-### Feature 1: JA3 Client Fingerprinting
+**Shadow Hunter** is an enterprise-grade **Active Defense AI platform**, specifically engineered to counteract the proliferation of "Shadow AI"—the unauthorized, unsanctioned use of Generative AI productivity tools—and to detect sophisticated lateral movement that evades standard signature-based IDSs.
 
-- **Risk:** Malware impersonating "Chrome".
-- **Solution:** Hashes the TLS ClientHello (Ciphers+Extensions).
-- **Logic:** `pkg/data/ja3_intel.py` contains 18 known signatures (Cobalt Strike, Python, Trickbot).
-- **Alert:** `Spoofing Detected` if User-Agent != JA3 Signature.
-
-### Feature 2: Active Interrogation
-
-- **Risk:** Unknown "Shadow AI" APIs.
-- **Solution:** `ActiveProbe` sends HTTP `OPTIONS /` and `GET /v1/models`.
-- **Safety:** Never probes Internal IPs. Rate-limited (10/min).
-
-### Feature 3: Graph Centrality
-
-- **Risk:** Lateral Movement (Compromised laptop scanning servers).
-- **Solution:** `GraphAnalyzer` runs **Betweenness Centrality** every 60s.
-- **Math:** $C_B(v) = \sum \sigma_{st}(v) / \sigma_{st}$.
-- **Alert:** "High Centrality" on an endpoint node.
-
-### Feature 4: Auto-Response
-
-- **Risk:** Fast-moving ransomware.
-- **Solution:** `ResponseManager` keeps an in-memory blocklist.
-- **Logic:** CRITICAL Alert -> Block IP for 1 hour. Whitelists DNS/Gateways.
+*   **Active Over Passive:** Traditional security systems rely on passive logging and rule matching. Shadow Hunter acts as an autonomous agent, probing suspicious endpoints (Interrogation) and dynamically issuing block commands (Auto-Response).
+*   **Cryptographic Verification Over Metadata:** Malicious actors easily spoof `User-Agent` headers. Shadow Hunter relies on **JA3 TLS Fingerprinting** to cryptographically verify the origin client software, instantly flagging impersonation attempts.
+*   **Topological Threat Analysis Over Isolated Packet Inspection:** Instead of viewing packets in isolation, the system calculates the entire network as a Force-Directed Graph, using advanced centrality math to pinpoint internal nodes acting as bridges for lateral exfiltration.
 
 ---
 
-## 4. The AI Engine (Algorithms)
+## 2. Macro System Architecture
+
+Shadow Hunter employs a decoupled, event-driven microservices design, unified into a monolithic runner for simplified deployment (`run_local.py`).
+
+### Data Flow Pipeline
+
+1.  **Capture Layer (`sniffer.py`)**: Intercepts packets natively off the wire, parsing crucial TLS metadata (JA3, SNI) without decrypting payloads.
+2.  **Message Broker (`broker.py`)**: An asynchronous Pub/Sub queue decouples high-speed packet capture from computationally intensive machine learning analysis.
+3.  **Intelligence Engine (`engine.py`)**: 
+    *   **Enrichment**: Appends GeoIP, ASN, and Threat Intel tagging.
+    *   **Triad Detection**: Subjects telemetry to ML Models, Boolean rules, and JA3 validation.
+    *   **Topography**: Mutates the SQLite-backed network graph structure.
+4.  **Active Defense Module (`interrogator.py`)**: Dispatches HTTP probes to verify the nature of unclassified external targets.
+5.  **Automated Response (`manager.py`)**: Seamlessly isolates and blocks IP ranges flagged as CRITICAL threats.
+6.  **Control Plane (Dashboard)**: Visualizes the topological map and threat telemetry in real-time via WebSockets.
+
+---
+
+## 3. Core Feature Deep Dive
+
+### Feature 1: JA3 TLS Fingerprinting Pipeline
+*   **Threat Vector:** Advanced malware or custom Python scripts impersonating standard browsers (e.g., `Mozilla/5.0`) to evade web filtering.
+*   **Detection Mechanism:** The sniffer uniquely hashes the TLS ClientHello (Ciphers + Extensions). 
+*   **Validation Logic:** `pkg/data/ja3_intel.py` cross-references the hash against known cryptographic signatures (e.g., Cobalt Strike, raw Python requests, Trickbot). If a cryptographic mismatch with the claimed header is detected, an immediate high-confidence alert is generated.
+
+### Feature 2: Active Interrogation Protocols
+*   **Threat Vector:** Zero-day or unlisted external AI APIs used for code/data exfiltration.
+*   **Detection Mechanism:** The `ActiveProbe` component transitions from passive to active. It dispatches a harmless `HTTP OPTIONS /` or targeted `GET` request to the suspect IP.
+*   **Validation Logic:** Based on CORS configurations (`Access-Control-Allow-Origin`) or RESTful headers (`Allow: POST, application/json`), the system confirms the endpoint is an automated API server rather than an HTML website. Strict internal safeguards prevent probing of private subnets.
+
+### Feature 3: Live Graph Centrality Analysis
+*   **Threat Vector:** Internal lateral movement; compromised endpoints acting as pivot points.
+*   **Detection Mechanism:** `GraphAnalyzer` continuously rebuilds the network topography and calculates **Betweenness Centrality** ($C_B(v) = \sum \sigma_{st}(v) / \sigma_{st}$) for every node at 60-second intervals.
+*   **Validation Logic:** A sudden, statistically significant spike in centrality for a specific internal node indicates it has become an illicit relay or collection point, prioritizing it for analyst review.
+
+### Feature 4: Autonomous Response Routing
+*   **Threat Vector:** High-velocity data exfiltration necessitating zero-latency disruption.
+*   **Detection Mechanism:** `ResponseManager` maintains an active, in-memory firewall blocklist.
+*   **Validation Logic:** Any event breaching the CRITICAL threshold triggers an automatic 1-hour IP quarantine, actively dropping packets while cleanly bypassing whitelisted essential infrastructure.
+
+---
+
+## 4. Machine Learning Engine
+
+The intelligence core relies on a Triad architecture to eliminate single points of failure.
 
 ### A. Deep Learning Autoencoder
-
-- **Role:** Zero-Day Anomaly Detection.
-- **Theory:** Trained on "Normal" traffic. Malicious traffic has high **Reconstruction Error**.
-- **Input:** Packet size sequences, Inter-arrival times.
+*   **Role:** Zero-Day protocol and behavioral anomaly detection.
+*   **Methodology:** Trained exclusively on standard acceptable corporate traffic, the neural network models packet size distributions and inter-arrival timing. When forced to reconstruct the unseen geometry of an unauthorized AI query, the model outputs a massive **Reconstruction Error**, flagging the event immediately.
 
 ### B. Random Forest Classifier
-
-- **Role:** Traffic Classification.
-- **Classes:** `Normal`, `Suspicious`, `Shadow_AI`.
-- **Features:** SNI, Cert Issuer, Entropy.
+*   **Role:** High-confidence telemetry classification.
+*   **Methodology:** A supervised model trained to categorize normalized flows into `Normal`, `Suspicious`, or `Shadow_AI` based on features like Server Name Indication (SNI), Entropy, and upstream/downstream byte asymmetry.
 
 ### C. Isolation Forest
-
-- **Role:** Statistical Outlier Detection.
-- **Theory:** Anomalies are "few and different" (easier to isolate).
-
----
-
-## 5. Codebase Reference (Grain-to-Grain)
-
-This section details the implementation of every key component, mapping files to their specific responsibilities and algorithms.
-
-### 📂 Root
-
-#### `run_local.py`
-
-- **Monolith Entry Point**: Orchestrates the startup of all services.
-- **Modes**:
-  - `DEMO` (Default): Uses `TrafficGenerator` to simulate employees.
-  - `LIVE` (`--live`): Requires root/admin for Scapy packet capture.
-- **Logic**: Initializes `MemoryBroker`, `SQLiteGraphStore`, and starts the `uvicorn` server for the API.
+*   **Role:** Mathematical Outlier Detection.
+*   **Methodology:** Operates on the premise that anomalies are "few and different." It excels at identifying statistical deviations in volumetric data without needing prior exposure to the specific threat signature.
 
 ---
 
-### 📂 `pkg/` — Shared Core & Data
+## 5. Codebase Anatomy Map
 
-#### `pkg/core/interfaces.py`
+This grain-to-grain map connects logical components to physical files.
 
-- **`EventBroker` (ABC)**: Defines the contract for the message bus. Methods: `publish()`, `subscribe()`.
-- **`GraphStore` (ABC)**: Defines the contract for the graph database. Methods: `add_node()`, `add_edge()`, `get_all_nodes()`.
+### Root Execution
+*   **`run_local.py`**: The monolithic orchestrator. Launches the `MemoryBroker`, `SQLiteGraphStore`, and unified `FastAPI` instance. Supports `--live` execution for genuine packet inspection or default `DEMO` execution via `TrafficGenerator`.
 
-#### `pkg/data/`
+### `pkg/` — Core Primitives
+*   **`pkg/core/interfaces.py`**: Abstract Base Classes ensuring strict contracts for `EventBroker` and `GraphStore`.
+*   **`pkg/data/ja3_intel.py`**: Houses the O(1) `JA3Matcher` and the signature database mapping TLS hashes to known software clients.
+*   **`pkg/data/cidr_threat_intel.py`**: The fast-filter engine for known major AI providers (OpenAI, Anthropic).
+*   **`pkg/models/events.py`**: Pydantic declarations, specifically `NetworkFlowEvent`, the universal telemetry standard internally.
+*   **`pkg/infra/local/broker.py`**: The `asyncio.Queue` based event bus driving decoupling.
 
-- **`ja3_intel.py`**:
-  - **`JA3Matcher`**: Pre-indexes `JA3_DATABASE` (list of dictionaries) for O(1) lookups.
-  - **`detect_spoofing(ja3_hash, user_agent)`**: Logic to catch tools impersonating browsers. Checks if `User-Agent` claims "Chrome" but JA3 matches "Python requests".
-  - **Database**: Contains 18+ fingerprints including _Cobalt Strike Beacon_, _Metasploit_, _Mirai_, and standard browsers.
-- **`cidr_threat_intel.py`**:
-  - **`CIDRMatcher`**: Compiles `AI_CIDR_DATABASE` into `ipaddress.ip_network` objects.
-  - **Logic**: Matches destination IPs against known ranges for OpenAI, Anthropic, Google Vertex, etc. Returns `ThreatIntelMatch` with risk levels.
-- **`ai_domains.py`**:
-  - **`is_ai_domain(domain)`**: Validates domains against a set of 120+ GenAI providers (_OpenAI, Midjourney, HuggingFace_). Handles subdomain matching.
+### `services/listener` — Interception
+*   **`sniffer.py`**: Deep Packet Inspection engine utilizing Scapy. Handles `packet_callback` offloading to async queues, parsing Host headers, and extracting the critical Client Hello JA3 data.
 
-#### `pkg/infra/local/`
+### `services/analyzer` — Processing
+*   **`engine.py` (`AnalyzerEngine`)**: The central processing loop. Enriches data, dictates Graph updates, runs concurrent Triad Detection pipelines, and manages the lifecycle of generated Alerts.
+*   **`detector.py`**: The Boolean rule engine evaluating loaded logic plugins against the `NetworkFlowEvent`.
 
-- **`broker.py` (`MemoryBroker`)**:
-  - Implements `EventBroker` using `asyncio.Queue`.
-  - **`_process_queues()`**: Background task that dispatches messages to subscribers.
-  - **Usage**: Decouples the blocking Scapy sniffer from the AsyncIO analyzer engine.
+### `services/active_defense` — Validation
+*   **`interrogator.py` (`ActiveProbe`)**: Executes safe external HTTP reconnaissance sequences (`probe_http_options()`, `probe_ai_endpoint()`) to fact-check the ML Engine's suspicions.
 
-#### `pkg/models/events.py`
+### `services/graph` — Topography
+*   **`analytics.py` (`GraphAnalyzer`)**: Houses the heavily mathematical `detect_lateral_movement()` function, integrating closely with NetworkX to continuously extract Betweenness measurements.
 
-- **`NetworkFlowEvent`**: Pydantic model for internal telemetry.
-  - Fields: `source_ip`, `destination_ip`, `protocol` (Enum: TCP/UDP/HTTP/DNS), `metadata` (Dict).
-  - **Normalization**: All raw packets convert to this structure before analysis.
+### `services/intelligence` — ML Wrappers
+*   **`engine.py` (`IntelligenceEngine`)**: Vectorizes events and distributes inference loads across the Autoencoder, Random Forest, and Isolation Forest models before fusing the risk scores.
 
----
-
-### 📂 `services/listener` — Traffic Capture
-
-#### `sniffer.py`
-
-- **`PacketProcessor`**:
-  - **`process_packet_callback(packet)`**: Runs in Scapy's thread. Pushes raw packets to an `asyncio.Queue` (buffer size 1000) to prevent packet loss.
-  - **`_process_single(packet)`**: The "DPI" (Deep Packet Inspection) engine.
-    - **HTTP**: Extracts `Host` header.
-    - **TLS**: Parses Client Hello to extract **SNI** and calculate **JA3** (MD5 of handshake fields).
-    - **DNS**: Extracts query name (`qname`).
-  - **Optimization**: Ignores non-IP traffic and filters internal broadcast noise.
-
----
-
-### 📂 `services/analyzer` — The Brain
-
-#### `engine.py` (`AnalyzerEngine`)
-
-- **Orchestrator**: The central loop of the application.
-- **`handle_traffic_event(event)`**:
-  1.  **Enrichment**: Resolves `src`/`dst` types (Internal vs External vs Shadow AI).
-  2.  **Graph Update**: Async calls to `graph.add_node()` and `graph.add_edge()` (concurrent `asyncio.gather`).
-  3.  **Detection Pipeline**:
-      - **Rule-based**: Calls `AnomalyDetector`.
-      - **ML-based**: Calls `IntelligenceEngine` (if models loaded).
-      - **Intelligence**: query `JA3Matcher` and `CIDRMatcher`.
-  4.  **Alerting**: Generates `alert` objects with enriched context (JA3 details, AI risk scores).
-  5.  **Active Defense**: Triggers `ActiveProbe` for CRITICAL alerts.
-  6.  **Auto-Response**: Calls `ResponseManager` to block IPs if severity is CRITICAL.
-
-#### `detector.py` (`AnomalyDetector`)
-
-- **Rule Engine**: Simple boolean logic for immediate threats.
-- **`detect(event)`**: Checks against loaded plugins (e.g., "Block Port 445", "Flag non-standard ports").
-
----
-
-### 📂 `services/active_defense` — Verifier
-
-#### `interrogator.py` (`ActiveProbe`)
-
-- **Safety First**: Checks `_is_internal_ip()` and `_is_rate_limited()` before any network activity.
-- **`interrogate(target)`**: Sequence of probes:
-  1.  **`probe_http_options()`**: Sends `OPTIONS /`. Checks `Server`, `X-Request-ID`, `Access-Control-Allow-Origin` headers.
-  2.  **`probe_ai_endpoint()`**: Sends `GET /v1/models` (OpenAI style) or `/api/tags` (Ollama style).
-  3.  **Verdict**: Returns `confirmed_ai: True` if signature headers or JSON responses match known AI schemas.
-
----
-
-### 📂 `services/graph` — Lateral Movement
-
-#### `analytics.py` (`GraphAnalyzer`)
-
-- **`detect_lateral_movement()`**:
-  - Runs periodically (every 60s).
-  - Builds a **NetworkX** DiGraph from the persistent store.
-  - Calculates **Betweenness Centrality** ($C_B(v)$).
-  - **Logic**: Identifies "Bridge Nodes" — internal IPs with high centrality that connect disparate subnets.
-  - **Filtering**: Ignores known infrastructure (Gateways, DNS) via `INFRASTRUCTURE_PATTERNS`.
-
----
-
-### 📂 `services/api` — Integration Layer
-
-#### `main.py`
-
-- **FastAPI Core**: Serves the REST API and mounts the dashboard.
-- **Routers**:
-  - `policy.py`: Handles alerts, blocking, and compliance logic.
-  - `discovery.py`: Serves graph data for the 3D visualization.
-- **Middleware**: Configures CORS to allow the Vite-based dashboard to communicate with the backend.
-
----
-
-### 📂 `services/intelligence` — ML Engine
-
-#### `engine.py` (`IntelligenceEngine`)
-
-- **Combined Inference**: Orchestrates three distinct models for maximum coverage.
-- **`analyze(event)`**:
-  1.  **Feature Extraction**: Converts packet size/timing sequences into numerical vectors.
-  2.  **`AnomalyModel` (Isolation Forest)**: Unsupervised detection of statistical outliers (Score < -0.2).
-  3.  **`TrafficClassifier` (Random Forest)**: Supervised classification into `Normal`, `Suspicious`, or `Shadow_AI`.
-  4.  **`ShadowAutoencoder`**: Deep Learning reconstruction error for zero-day anomalies.
-  5.  **Risk Scoring**: Fuses confidence scores from all models. E.g., if IF and AE both flag it -> Risk 0.85+.
-- **`session_analyzer`**: Tracks behavior over time (e.g., total bytes, velocity) to catch slow-drip exfiltration.
-
----
-
-### 📂 `services/response` — Auto-Remediation
-
-#### `manager.py` (`ResponseManager`)
-
-- **`block_ip(ip, severity)`**:
-  - **Whitelist Check**: Protects DNS (8.8.8.8) and Gateways.
-  - **State**: Adds IP to in-memory `_blocked` dict with a TTL (default 1 hour).
-  - **Audit**: Logs every action to `_audit_log`.
-- **`is_blocked(ip)`**: Checked by the simulated firewall to drop traffic.
+### `services/api` — Integration & Dashboards
+*   **`main.py` & Routers (`policy.py`, `discovery.py`)**: The FastAPI infrastructure providing performant REST access to the SQLite backends and WebSocket streams to the React frontend.
 
 ---
 
 ## 6. Database Schema
 
-**File:** `shadow_hunter.db` (SQLite)
+**Store:** `shadow_hunter.db` (SQLite3)
 
-### Table: `nodes`
+### Entity: `nodes`
+| Column | Type | Purpose |
+| :--- | :--- | :--- |
+| `id` | TEXT (PK) | IPv4 Address (e.g., `10.0.0.5`) or FQDN (`api.openai.com`). |
+| `labels` | TEXT | JSON Encoded Arrays (e.g., `["Node", "External"]`). |
+| `properties` | TEXT | JSON Object detailing type, risk_score, and OS flags. |
 
-| Column       | Type      | Description                                                         |
-| :----------- | :-------- | :------------------------------------------------------------------ |
-| `id`         | TEXT (PK) | IP Address (e.g., `192.168.1.5`) or Domain (`google.com`).          |
-| `labels`     | TEXT      | JSON List using `["Node"]`.                                         |
-| `properties` | TEXT      | JSON Object. Contains `type` (`internal`/`external`), `risk_score`. |
-
-### Table: `edges`
-
-| Column       | Type      | Description                                                                            |
-| :----------- | :-------- | :------------------------------------------------------------------------------------- |
-| `source`     | TEXT (FK) | Origin IP.                                                                             |
-| `target`     | TEXT (FK) | Destination IP/Domain.                                                                 |
-| `relation`   | TEXT      | Usually `TALKS_TO`.                                                                    |
-| `properties` | TEXT      | JSON Object. Contains `protocol` (`TCP`/`UDP`), `dst_port`, `byte_count`, `last_seen`. |
+### Entity: `edges`
+| Column | Type | Purpose |
+| :--- | :--- | :--- |
+| `source` | TEXT (FK) | Originator Node ID. |
+| `target` | TEXT (FK) | Destination Node ID. |
+| `relation` | TEXT | Relational context (e.g., `TALKS_TO`). |
+| `properties` | TEXT | JSON Object tracking `dst_port`, `byte_count`, protocol, and last active timestamp. |
 
 ---
 
 ## 7. API Reference
 
-**Base URL:** `http://localhost:8000/api/v1`
+**Base:** `http://localhost:8000/api/v1`
 
-### 🛡️ Policy & Alerting (`/policy`)
+### Policy & Command (`/policy`)
+*   `GET /alerts` : Live operational threat feed.
+*   `GET /blocked` : Currently isolated IP addresses matrix.
+*   `POST /rules` : Apply dynamic firewall and alert configurations.
+*   `GET /briefing` : Executive-level, natural language threat digest.
 
-| Endpoint      | Method     | Description                                                   |
-| :------------ | :--------- | :------------------------------------------------------------ |
-| `/alerts`     | `GET`      | Real-time threat feed of active security incidents.           |
-| `/blocked`    | `GET`      | List of currently quarantined IPs (Active Defense).           |
-| `/rules`      | `GET/POST` | CRUD for policy rules (e.g., "Block ChatGPT for Finance").    |
-| `/compliance` | `GET`      | SOC2/GDPR/HIPAA compliance scoring based on traffic.          |
-| `/briefing`   | `GET`      | AI-generated executive threat summary (Natural Language).     |
-| `/dlp`        | `GET`      | Data Loss Prevention incidents (PII/API Key leaks).           |
-| `/timeline`   | `GET`      | Alert distribution bucketed by minute for time-series charts. |
-| `/sessions`   | `GET`      | User activity sessions grouped by 5-minute windows.           |
-| `/profiles`   | `GET`      | Behavioral profiles (typical hours, top destinations) per IP. |
-| `/report`     | `GET`      | Summary statistics of Shadow AI usage and top offenders.      |
-
-### 🔍 Discovery & Graph (`/discovery`)
-
-| Endpoint         | Method | Description                                      |
-| :--------------- | :----- | :----------------------------------------------- |
-| `/nodes`         | `GET`  | All graph nodes for D3.js/Cosmos visualization.  |
-| `/edges`         | `GET`  | All graph connections (dependencies).            |
-| `/risk-scores`   | `GET`  | Calculated risk scores (0-100) per internal IP.  |
-| `/traffic-stats` | `GET`  | Protocol breakdown and device type distribution. |
+### Topography & State (`/discovery`)
+*   `GET /nodes` : Total active network entities for visualization UI.
+*   `GET /edges` : Relationship vectors for map rendering.
+*   `GET /risk-scores` : Aggregated integer scores mapping threat topology.
 
 ---
 
-## 8. Demo Walkthrough Script
+## 8. Demo Walkthrough Script (Hackathon Judging)
 
-**Prerequisite:** Run `python run_local.py` (Demo Mode). This starts a simulation of **5 virtual employees** generating realistic traffic patterns.
+**Prep:** Execute `python run_local.py` to initiate the simulation engine modeling 5 standard corporate employees.
 
-**Step 1: The Baseline (0:00)**
+**Phase 1: The Baseline (0:00)**
+*   **Action:** Navigate to `http://localhost:5173`.
+*   **Visual:** The 3D Force Graph stabilizes. Internal nodes (Blue) communicate with standard external nodes (Green).
+*   **Narrative:** "The system maps the environment live. Here, the ML baseline recognizes standard operational traffic—nothing is flagged."
 
-- **Action:** Open Dashboard (`http://localhost:5173`).
-- **Visual:** You see the 3D Force Graph building live. Blue nodes are internal devices, green are external websites.
-- **Narrative:** "This is a living map of our network. The system is currently observing standard business traffic—email, browsing, cloud storage."
+**Phase 2: The Anomaly (0:45)**
+*   **Event:** Simulated Data Scientist initiates an unauthorized AI code push. 
+*   **Visual:** Alert fires; connection edge shifting to **YELLOW**.
+*   **Narrative:** "The Deep Autoencoder detected a structural payload asymmetry. Standard firewalls miss this encoded traffic, but the AI recognized the silhouette of a generative query."
 
-**Step 2: The anomaly (0:45)**
+**Phase 3: Active Interrogation (1:15)**
+*   **Action:** Review the Intelligence Logs.
+*   **Visual:** Log entry `[ACTIVE DEFENSE] Probing host...` followed by `[CONFIRMED]`.
+*   **Narrative:** "Shadow Hunter didn't guess. It instantly pivoted, actively probed the destination IP, and cryptographically verified it as an AI endpoint."
 
-- **Event:** A "Shadow AI Usage" alert triggers. A node connects to an unknown external IP.
-- **Visual:** The connection turns **YELLOW**.
-- **Narrative:** "Our ML engine detected a deviation. Employee 'Bob' is sending large payloads to an unclassified endpoint. Most firewalls would miss this because it looks like generic HTTPS."
-
-**Step 3: Verification (1:15)**
-
-- **Action:** Check the "Active Monitoring" log in the dashboard.
-- **Log:** `[ACTIVE DEFENSE] Probing host 142.250.x.x...` -> `[CONFIRMED] Target is Google Gemini API`.
-- **Narrative:** "Shadow Hunter didn't just guess. It actively probed the destination, confirming it's an AI service despite the encrypted traffic."
-
-**Step 4: Auto-Remediation (2:00)**
-
-- **Event:** The risk score hits **Critical (0.95)** due to data exfiltration pattern.
-- **Visual:** The node turns **RED** and connections are severed.
-- **Narrative:** "The system automatically updated the firewall rules. The device is quarantined, and the session is terminated before sensitive data is lost."
+**Phase 4: Auto-Remediation (1:45)**
+*   **Event:** Risk Score breaches Critical limits.
+*   **Visual:** Target node updates to **RED**, traffic terminates.
+*   **Narrative:** "Upon verification, the system autonomously updated the internal blocklist, halting data exfiltration milliseconds after detection."
 
 ---
 
-## 9. Setup & Troubleshooting
+## 9. Setup & Deployment
 
-### Prerequisites
+### Environment Prerequisites
+*   Python 3.10+
+*   Node.js 18+ 
+*   Npcap Driver (Windows Live Mode) or `libpcap` (Linux)
 
-- Python 3.10+
-- Node.js 18+ (for Dashboard)
-- Npcap (for Live Capture on Windows)
-
-### Commands
+### Execution Procedures
 
 ```bash
-# Start Backend
-python run_local.py         # Demo Mode
-python run_local.py --live  # Live Mode (Needs Root/Admin)
+# 1. Initialize Dependency Trees
+pip install -r requirements.txt
+cd services/dashboard && npm install
 
-# Start Frontend
+# 2. Launch Core Systems
+# Option A: Synthetic Evaluation (Demo Mode)
+python run_local.py 
+
+# Option B: Raw Interface Capture (Live Mode) - Requires Admin/Root
+python run_local.py --live
+
+# 3. Mount Visualization Dashboard
 cd services/dashboard
 npm run dev
 ```
 
-### Common Issues
-
-- **"Address in use"**: Kill python process using port 8000.
-- **"Database locked"**: Close `inspect_db.py`.
-- **"No alerts"**: Wait 1-2 mins for simulation to roll various scenarios.
-
 ---
-
-_End of Definitive Guide_
+*Built for the CA Hackathon 2026. Defining the standard for AI-driven Active Network Defense.*

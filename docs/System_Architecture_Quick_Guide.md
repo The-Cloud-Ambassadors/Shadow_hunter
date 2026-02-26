@@ -1,67 +1,68 @@
-# 🏗️ Shadow Hunter: Detailed System Architecture
+# Shadow Hunter: System Architecture Quick Guide
 
-Shadow Hunter is a real-time, AI-driven cybersecurity pipeline built to detect unauthorized "Shadow AI" usage (e.g., employees using ChatGPT, Claude, or unauthorized code assistants).
+Shadow Hunter is a real-time, AI-driven active defense cybersecurity platform. It is engineered to detect, verify, and neutralize "Shadow AI"—the unauthorized use of generative AI tools (e.g., ChatGPT, Claude) or covert automated communication that standard firewalls classify as benign web browsing.
 
-Because employees often use these AI tools via APIs, Python scripts, or browser extensions, traditional firewalls looking for "web browsing" miss them. Shadow Hunter solves this by analyzing the _behavioral shape_ of the network traffic.
+To achieve this, Shadow Hunter bypasses traditional header inspections and instead analyzes the behavioral topography and cryptographic fingerprints of network traffic.
 
 ---
 
-## 🏗️ The Four-Stage Architecture
+## The Four-Stage Architecture
 
-### 1. The Capture Layer (Listener & Simulator)
+### 1. The Capture Layer (Listener & Event Parsing)
 
-**Purpose:** Sniff raw network packets off the wire and convert them into structured JSON events that the rest of the system can understand.
+**Purpose:** Intercept raw network packets off the wire and convert them into structured event telemetry.
 
-- **Live Mode (`services/listener`):** Uses Python's `scapy` library to hook directly into the computer's network interface (e.g., Wi-Fi or Ethernet). It captures raw packets as they fly by.
-- **Demo Mode (`services/simulator`):** A sophisticated traffic generation engine. It creates "Personas" (like a Marketing Intern vs. a Data Scientist) and generates realistic fake network traffic to simulate both normal behavior and stealthy Shadow AI usage without needing a live corporate network.
-- **Event Generation:** The raw packets are condensed into `NetworkFlowEvent` objects. Instead of storing the whole packet (which takes too much space), it just stores the Metadata: `source_ip`, `dest_ip`, `dest_port`, `bytes_sent`, `bytes_received`, and `duration`.
-- **Message Broker (`services/broker`):** These events are instantly pushed into a central, asynchronous queue (via Python's `asyncio.Queue`) so the core engine can process thousands of events per second without dropping packets.
+*   **Live Mode (`services/listener`):** Utilizes `scapy` (or natively bound packet capture libraries) to hook directly into the host machine's network interface, capturing raw packets in real-time.
+*   **Demo Mode (`services/simulator`):** A high-fidelity traffic generation engine used for evaluation. It instantiates virtual "Personas" that synthesize realistic corporate network traffic interspersed with stealthy Shadow AI usage logic.
+*   **Event Condensation:** Raw packets are streamlined into `NetworkFlowEvent` objects. This significantly reduces memory overhead by retaining only vital metadata: `source_ip`, `dest_ip`, `dest_port`, `bytes_sent`, `bytes_received`, `duration`, and TLS handshake parameters.
+*   **Message Broker (`services/broker`):** NetworkFlowEvents are pushed asynchronously into an in-memory queue, allowing the core intelligence engine to scale and process thousands of events per second without packet starvation or dropped connections.
 
-> 💡 **Example:**
-> An employee runs a Python script that sends a prompt to Anthropic's Claude API.
-> The Capture layer sees a TCP connection to `34.102.136.x`. It records that `192.168.1.5` sent `850 bytes` and received `4,200 bytes` over exactly `1.2 seconds`. It packages this info and sends it to the broker.
+**Operational Example:**
+> A Python script initiates an Anthropic Claude API query. The Capture Layer intercepts the TCP connection to `34.102.136.x`, recording that internal node `192.168.1.5` transmitted 850 bytes and received 4,200 bytes over exactly 1.2 seconds, before pushing this telemetry to the broker.
 
-### 2. The Brain (Enrichment & Intelligence Engine)
+### 2. The Intelligence Engine (Enrichment & Machine Learning)
 
-**Purpose:** Pull events from the broker, figure out what they are, and assign a mathematical Risk Score.
+**Purpose:** Ingest event telemetry, enrich the data with threat intelligence, and assign a mathematical Risk Score using comprehensive machine learning models.
 
-- **CIDR Threat Intel (`pkg/data/cidr_threat_intel.py`):** Before using complex math, the system does a fast check. It matches the destination IP against a hardcoded database of known AI provider IP blocks (OpenAI, Google, Anthropic). If it matches, the event gets instantly tagged (e.g., `Provider: Anthropic`, `Risk: CRITICAL`).
-- **Feature Extraction:** The system looks at the raw numbers (bytes, duration) and mathematically transforms them. For example, it calculates the "byte ratio" (bytes received ÷ bytes sent).
-- **The ML Pipeline (`services/intelligence`):** The event is passed through three parallel machine learning models:
-  1.  **Isolation Forest (Scikit-Learn):** A statistical model trained on millions of "normal" corporate traffic events. If the current event sits far outside the normal cluster in multi-dimensional space, it is flagged as an anomaly.
-  2.  **Deep Autoencoder:** A neural network that tries to compress the event into a tiny 8-neuron bottleneck and unpack it again. Because it has only ever seen "normal" browser traffic, it utterly fails to reconstruct the weird shape of a zero-day API call. This causes a massive "Reconstruction Error," flagging the event.
-  3.  **Random Forest Classifier:** A supervised model trained to look at the byte ratio and packet timing to confidently say, _"This is 99% an API call, not a web browser interacting with a page."_
+*   **CIDR Threat Intel (`pkg/data/cidr_threat_intel.py`):** Acts as a primary fast-filter mechanism. The system matches destination IPs against a curated database of known AI provider IP blocks. Matches are instantly tagged with base provider constraints.
+*   **Feature Extraction:** Telemetry is transformed into actionable metrics. The system calculates dimensional features such as the "byte ratio" (bytes received ÷ bytes sent), packet cadence, and connection regularity.
+*   **The Triad ML Pipeline (`services/intelligence`):** Events are evaluated concurrently through three distinct models:
+    1.  **Isolation Forest:** A robust statistical anomaly detector trained on baseline corporate traffic. Events manifesting significantly outside the established hyper-dimensional norm are flagged.
+    2.  **Deep Autoencoder:** A neural network architecture designed for data reconstruction. Trained exclusively on normal browser traffic, it attempts to compress and reconstruct the event. A structural deviation, like a zero-day API format, produces a high "Reconstruction Error," signaling an anomaly.
+    3.  **Random Forest Classifier:** A supervised model formulated to evaluate packet cadence and byte telemetry. It yields a high-confidence probabilistic score indicating whether communication is generated by an automated API call or manual human web browsing.
 
-> 💡 **Example:**
-> The employee's Claude API call hits the Brain. The CIDR Intel confirms the IP belongs to Anthropic. The Random Forest sees a massive imbalance in byte ratio (sent a small prompt, got a massive essay back) and perfectly static timing. It flags the event with a `98%` confidence score that it is a programmatic API call, not casual web browsing.
+**Operational Example:**
+> Processed telemetry indicates a low latency interaction with extreme size asymmetry (small prompt out, massive payload in) and perfectly static timing. The Random Forest assigns a 98% confidence score confirming a programmatic API call, bypassing traditional SIEM heuristics.
 
 ### 3. Active Defense & Validation
 
-**Purpose:** Confirm the ML models' suspicions to prevent false positives, and identify exactly how widely the tool is being used.
+**Purpose:** Positively verify ML predictions, eliminate false positives through active interrogation, and identify lateral exfiltration topologies.
 
-- **Active Interrogator (`services/active_defense/interrogator.py`):** If the ML models flag an IP, Shadow Hunter sends a totally harmless "knock" (an `HTTP OPTIONS` request) to that external IP. If the IP responds with headers like `Allow: POST, application/json` or restrictive automated CORS headers, Shadow Hunter catches it red-handed—proving it is an automated API server, not a normal website rendering HTML.
-- **Graph Centrality Analytics (`services/graph/analytics.py`):** Builds a live mathematical map of the entire network using `networkx`. It calculates the **Betweenness Centrality** of every node. If an external IP suddenly becomes a massive "bridge" because 50 different employees are connecting to it simultaneously, the math proves it is a heavily-used shadow tool causing a corporate data leak bottleneck.
+*   **Active Interrogator (`services/active_defense/interrogator.py`):** Modifies the system's posture from passive listener to active sensor. Upon an initial ML flag, Shadow Hunter issues benign HTTP probes (e.g., `OPTIONS`, `HEAD`) directly to the target external IP. If the endpoint responds with restrictive CORS headers or `Allow: POST, application/json`, it is cryptographically verified as an automated endpoint.
+*   **Cryptographic Verification (JA3 Fingerprinting):** Analyzes the TLS Client Hello handshake. If a suspect connection claims to be a standard browser via its `User-Agent` but presents a conflicting cryptographic fingerprint (indicative of a raw Python script or Go binary), the inconsistency drastically escalates the risk score.
+*   **Graph Centrality Analytics (`services/graph/analytics.py`):** Maintains a continuous mathematical representation of the network topology via `networkx`. By calculating the **Betweenness Centrality** of individual nodes, the system identifies if an internal machine is acting as a centralized "bridge" relaying illicit AI queries for multiple users across the subnet.
 
-> 💡 **Example:**
-> The ML engine is 98% sure the employee is using the Claude API. The Active Interrogator pings the Anthropic IP, and the IP replies `Content-Type: application/json`. Boom, confirmed. Meanwhile, the Graph Engine notices that not just one, but _five_ different internal IPs are talking to that exact same Anthropic IP. The external IP glows bright red on the network map as a major Shadow AI hub.
+**Operational Example:**
+> Following a 98% ML anomaly score, the Active Interrogator confirms a `Content-Type: application/json` response from the target. The Graph engine simultaneously calculates a high Betweenness Centrality for the internal request node, indicating it is functioning as a centralized exfiltration point.
 
-### 4. The Control Plane (React Dashboard & API)
+### 4. The Control Plane (Dashboard & Threat Response)
 
-**Purpose:** Provide a beautiful, real-time command center for security analysts to monitor the network and enforce company policies.
+**Purpose:** Provide actionable, real-time command capabilities for security operators and autonomously enforce organizational data policies.
 
-- **Backend API (`services/api`):** A blazing-fast Python `FastAPI` server. It provides REST endpoints for getting historical data, and a live WebSocket connection that pushes new threat alerts instantly.
-- **Policy Engine:** Admins can write natural language rules like _"Block ChatGPT for the Finance Department."_
-- **Frontend Dashboard (`services/dashboard`):** A React application styled with Tailwind CSS. It features:
-  - **Live Network Topology:** A massive 2D node map (using Cytoscape.js) showing employees connecting to external servers in real time.
-  - **Intel Feed:** A scrolling feed of verified threats, showing exactly who did what, when.
-  - **Top Offenders:** A leaderboard of the internal IP addresses with the highest cumulative risk scores, showing the security team who to speak to first.
+*   **Backend API (`services/api`):** A high-performance Python `FastAPI` instance. It serves traditional REST endpoints for historical threat analysis and sustains WebSocket connections for millisecond-latency push alerts.
+*   **Automated Response Manager:** Executes automated remediation logic. When an IP or internal node breaches the critical risk threshold, the integrated firewall dynamically severs packet transceiving for that node.
+*   **Frontend Interface (`services/dashboard`):** A highly responsive React 18 application styled seamlessly with Tailwind CSS, offering:
+    *   **Live Operations Graph:** An interactive 3D Force-Directed mapping of current network behavior, classifying nodes intuitively (Internal, External, Target, Threat).
+    *   **Live Intel Feed:** Continuous, granular logs of Active Defense probing and automated verification results.
+    *   **Security Metrics:** Overview of highly suspect internal nodes and active mitigation policies.
 
 ---
 
-### 🛠️ Tech Stack Summary
+### Tech Stack Summary
 
-- **Backend & Data Processing:** Python 3.12+, `FastAPI` (REST + WebSockets), `scapy` (Packet sniffing), `asyncio` (Event loops)
-- **Machine Learning:** `scikit-learn` (Isolation Forest, Random Forest), `MLPRegressor` (Deep Autoencoder approximation)
-- **Graph Analytics:** `networkx` (Betweenness Centrality calculations)
-- **Frontend UI:** React 18, Vite, Tailwind CSS (for premium aesthetics), `lucide-react` (Icons)
-- **Data Visualization:** `cytoscape.js` (Live network mapping), `recharts` (Statistical charts)
+*   **Core Systems Platform:** Python 3.10+, `FastAPI` (REST / WebSockets), `asyncio`
+*   **Network Intelligence:** `scapy` (Packet Analysis), JA3 Fingerprinting logic
+*   **Advanced Analytics:** `scikit-learn` (Isolation & Random Forest), PyTorch/TensorFlow (Deep Autoencoders)
+*   **Topological Mapping:** `networkx` (Betweenness Centrality, Graph State)
+*   **Command Interface:** React 18, Vite, TailwindCSS
+*   **Visual Topography:** 3D Force-Graph, `recharts` for metrics rendering
