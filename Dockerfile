@@ -14,17 +14,18 @@ RUN apt-get update && apt-get install -y \
     libpcap-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first
-COPY requirements.txt .
+# Copy pyproject so pip can install dependencies declared there
+COPY pyproject.toml .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install project and dependencies from pyproject
+RUN pip install --no-cache-dir .
 
 # Copy full app
 COPY . .
 
 # Cloud Run expects port 8080
 ENV PORT=8080
+EXPOSE 8080
 
-# Start application (Snehal can adjust entrypoint later)
-CMD ["python", "run_local.py"]
+# Use uvicorn to serve the FastAPI app in production
+ENTRYPOINT ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
