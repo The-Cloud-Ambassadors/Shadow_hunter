@@ -81,9 +81,9 @@ async def get_mitre_matrix():
     total_hits = sum(col["total_hits"] for col in matrix)
 
     # --- HACKATHON DEMO FALLBACK ---
-    # If the system just booted and there are no alerts yet, inject a realistic looking 
+    # If the system just booted (hits < 5), inject a realistic looking 
     # matrix structure so the CISO dashboard isn't completely blank during a presentation.
-    if total_hits == 0:
+    if total_hits < 5:
         import time
         t_now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
         
@@ -92,11 +92,17 @@ async def get_mitre_matrix():
             "Initial Access": [
                 {"id": "T1190", "name": "Exploit Public-Facing App", "hits": 4, "alerts": [
                     {"id": "m-1", "severity": "HIGH", "source": "10.0.1.45", "target": "0.0.0.0", "timestamp": t_now}
+                ]},
+                {"id": "T1078", "name": "Valid Accounts", "hits": 8, "alerts": [
+                    {"id": "m-1a", "severity": "MEDIUM", "source": "10.0.1.12", "target": "VPN-Gateway", "timestamp": t_now}
                 ]}
             ],
             "Execution": [
-                {"id": "T1059.001", "name": "PowerShell", "hits": 12, "alerts": [
-                    {"id": "m-2", "severity": "CRITICAL", "source": "10.0.2.11", "target": "internal-server", "timestamp": t_now}
+                {"id": "T1059.006", "name": "Python Scripting", "hits": 12, "alerts": [
+                    {"id": "m-2", "severity": "CRITICAL", "source": "10.0.2.11", "target": "Internal-API-Server", "timestamp": t_now}
+                ]},
+                {"id": "T1059.001", "name": "PowerShell", "hits": 3, "alerts": [
+                    {"id": "m-2a", "severity": "HIGH", "source": "10.0.2.14", "target": "DC-01", "timestamp": t_now}
                 ]}
             ],
             "Persistence": [
@@ -104,10 +110,39 @@ async def get_mitre_matrix():
                    {"id": "m-3", "severity": "MEDIUM", "source": "10.0.1.99", "target": "DC-01", "timestamp": t_now}
                 ]}
             ],
+            "Evasion": [
+                 {"id": "T1036.005", "name": "Match Legitimate Name or Location", "hits": 18, "alerts": [
+                    {"id": "m-ev1", "severity": "HIGH", "source": "192.168.1.13", "target": "Shadow AI Process", "timestamp": t_now}
+                ]}
+            ],
+            "Discovery": [
+                {"id": "T1046", "name": "Network Service Discovery", "hits": 55, "alerts": [
+                    {"id": "m-d1", "severity": "MEDIUM", "source": "192.168.8.88", "target": "Subnet Scan", "timestamp": t_now}
+                ]}
+            ],
+            "Lateral Movement": [
+                {"id": "T1021.001", "name": "Remote Desktop Protocol", "hits": 6, "alerts": [
+                    {"id": "m-lm1", "severity": "HIGH", "source": "10.0.3.33", "target": "Finance-Server", "timestamp": t_now}
+                ]}
+            ],
             "Exfiltration": [
                 {"id": "T1048", "name": "Exfiltration Over Alternative Protocol", "hits": 24, "alerts": [
                     {"id": "m-4", "severity": "CRITICAL", "source": "10.0.5.55", "target": "ChatGPT Web API", "timestamp": t_now},
-                    {"id": "m-5", "severity": "HIGH", "source": "10.0.5.55", "target": "Kaggle", "timestamp": t_now}
+                    {"id": "m-5", "severity": "CRITICAL", "source": "10.0.5.55", "target": "Claude API", "timestamp": t_now},
+                    {"id": "m-6", "severity": "HIGH", "source": "10.0.5.55", "target": "HuggingFace Hub", "timestamp": t_now}
+                ]},
+                {"id": "T1567", "name": "Exfiltration Over Web Service", "hits": 15, "alerts": [
+                     {"id": "m-7", "severity": "HIGH", "source": "192.168.1.13", "target": "GitHub Copilot", "timestamp": t_now}
+                ]}
+            ],
+            "Command and Control": [
+                {"id": "T1071.001", "name": "Web Protocols (HTTPS)", "hits": 112, "alerts": [
+                    {"id": "m-cc1", "severity": "CRITICAL", "source": "192.168.2.4", "target": "Unknown-C2-Server", "timestamp": t_now}
+                ]}
+            ],
+            "Impact": [
+                 {"id": "T1498.001", "name": "Direct Network Flood", "hits": 400, "alerts": [
+                    {"id": "m-i1", "severity": "HIGH", "source": "10.0.9.9", "target": "External-DNS", "timestamp": t_now}
                 ]}
             ]
         }

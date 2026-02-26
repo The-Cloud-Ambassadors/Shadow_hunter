@@ -50,3 +50,6 @@ test_*.py
 # Documentation artifacts (Keep the ones in docs/, ignore duplicates in root if any)
 # But we want to track docs/ so:
 !docs/
+
+# Environment Variables
+.env

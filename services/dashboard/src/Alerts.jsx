@@ -494,7 +494,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                             />
                             {isAnalyzing && activeCopilotAlertId === alert.id
                               ? "Analyzing Incident..."
-                              : "✨ Copilot Analyze"}
+                              : "AI Analyze"}
                           </button>
 
                           <div className="flex gap-2 mt-1">
