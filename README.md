@@ -71,8 +71,8 @@ We utilize a triad of specialized models to ensure comprehensive coverage:
 ### 1. Environment Setup
 
 ```bash
-git clone https://github.com/antigravity/shadow-hunter.git
-cd shadow-hunter
+git clone https://github.com/The-Cloud-Ambassadors/Shadow_hunter.git
+cd Shadow_hunter
 
 # Install Backend Dependencies
 pip install -r requirements.txt
