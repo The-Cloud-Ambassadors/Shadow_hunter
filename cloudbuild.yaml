@@ -3,13 +3,16 @@ steps:
     args:
       - build
       - '-t'
-      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
+      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:${SHORT_SHA}'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
-      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
+      - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:${SHORT_SHA}'
 
 images:
-  - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:latest'
+  - 'asia-south1-docker.pkg.dev/shadow-hunter-prod/shadow-hunter-repo/shadow-hunter:${SHORT_SHA}'
+
+options:
+  substitutionOption: ALLOW_LOOSE
