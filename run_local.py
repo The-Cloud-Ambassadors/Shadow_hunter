@@ -10,6 +10,10 @@ import sys
 import uvicorn
 import os
 from loguru import logger
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from pkg.infra.local.broker import MemoryBroker
 from pkg.infra.local.store import NetworkXStore

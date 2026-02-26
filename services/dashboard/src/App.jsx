@@ -9,6 +9,7 @@ import PolicyEngine from "./PolicyEngine";
 import DlpMonitor from "./DlpMonitor";
 import KillChain from "./KillChain";
 import ComplianceBoard from "./ComplianceBoard";
+import MitreMatrix from "./MitreMatrix";
 import ExecutiveBriefing from "./ExecutiveBriefing";
 import { generatePdfReport } from "./generatePdfReport";
 import {
@@ -238,6 +239,12 @@ function App() {
             onClick={() => setActiveTab("killchain")}
             tooltip="Kill Chain"
           />
+          <NavItem
+            icon={<Layers />}
+            active={activeTab === "mitre"}
+            onClick={() => setActiveTab("mitre")}
+            tooltip="MITRE ATT&CK Info"
+          />
         </nav>
 
         <div className="mt-auto flex flex-col gap-6 items-center w-full px-2 pb-4">
@@ -453,8 +460,13 @@ function App() {
                           className="text-[10px] font-mono text-slate-300 truncate max-w-[120px]"
                           title={r.ip}
                         >
-                          {r.ip}
+                          {r.user_name || r.ip}
                         </div>
+                        {r.department && (
+                          <div className="text-[8px] font-mono text-blue-400/70 truncate max-w-[120px]">
+                            {r.department}
+                          </div>
+                        )}
                         <div className="w-full mt-1 bg-slate-800 rounded-full h-1">
                           <div
                             className={`h-1 rounded-full transition-all ${
@@ -569,6 +581,12 @@ function App() {
           {activeTab === "killchain" && (
             <div className="h-full p-3">
               <KillChain />
+            </div>
+          )}
+
+          {activeTab === "mitre" && (
+            <div className="h-full">
+              <MitreMatrix />
             </div>
           )}
 
@@ -948,7 +966,7 @@ const StatCard = ({
   <div
     className={`bg-sh-panel/50 backdrop-blur-md border ${borderColor} rounded-xl px-4 py-2 flex items-center gap-3 shadow-lg min-w-[140px] transition-all hover:scale-105 hover:bg-sh-panel/80 ${className}`}
   >
-    <div className="p-2 bg-slate-800/50 rounded-lg">
+    <div className="p-2 rounded-lg">
       {React.cloneElement(icon, { size: 18 })}
     </div>
     <div>

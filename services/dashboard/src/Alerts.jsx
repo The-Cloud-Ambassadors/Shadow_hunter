@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchAlerts } from "./api";
+import { fetchAlerts, quarantineNode } from "./api";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -16,11 +16,17 @@ import {
   Crosshair,
   Zap,
   ExternalLink,
+  Lock,
 } from "lucide-react";
 
 const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
   const [alerts, setAlerts] = useState([]);
   const [selectedAlert, setSelectedAlert] = useState(null);
+
+  // Copilot State
+  const [copilotText, setCopilotText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [activeCopilotAlertId, setActiveCopilotAlertId] = useState(null);
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -32,6 +38,21 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
     const interval = setInterval(loadAlerts, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleQuarantine = async (e, ip) => {
+    e.stopPropagation();
+    if (
+      window.confirm(
+        `⚠️ ACTIVE DEFENSE\n\nAre you sure you want to QUARANTINE node ${ip}?\nThis will trigger the kill-switch and isolate the node.`,
+      )
+    ) {
+      const res = await quarantineNode(
+        ip,
+        "Manual quarantine from Alerts panel",
+      );
+      if (res) alert(`✅ Node ${ip} quarantined successfully.`);
+    }
+  };
 
   const filtered = alerts.filter((a) => {
     if (!searchQuery) return true;
@@ -117,7 +138,14 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
             return (
               <div
                 key={alert.id}
-                onClick={() => setSelectedAlert(isSelected ? null : alert)}
+                onClick={() => {
+                  setSelectedAlert(isSelected ? null : alert);
+                  if (!isSelected) {
+                    setCopilotText("");
+                    setIsAnalyzing(false);
+                    setActiveCopilotAlertId(null);
+                  }
+                }}
                 className={`group relative bg-slate-900/80 hover:bg-slate-800 p-3 rounded-lg border transition-all cursor-pointer ${
                   isSelected
                     ? `border-slate-500 ${sev.glow}`
@@ -349,32 +377,156 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                       </div>
                     </DetailSection>
 
-                    {/* Source / Target Navigation */}
+                    {/* AI Copilot Streaming View - Moved up for visibility */}
+                    {(activeCopilotAlertId === alert.id || (copilotText && activeCopilotAlertId === alert.id)) && (
+                      <div className="p-3 bg-slate-950/90 border border-purple-500/40 rounded-xl relative overflow-hidden group shadow-lg shadow-purple-900/10 my-2">
+                        <div className="absolute inset-0 bg-linear-to-b from-purple-500/5 to-transparent pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+                        <div className="flex items-center gap-2 mb-3 border-b border-purple-500/30 pb-2 relative">
+                          <Zap size={13} className="text-purple-400" />
+                          <span className="text-[10px] font-mono font-bold text-slate-200 uppercase tracking-widest text-shadow-sm">
+                            Hunter AI Investigation
+                          </span>
+                          {isAnalyzing && (
+                            <span className="flex h-2 w-2 relative ml-auto mr-1">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto custom-scrollbar pr-2 relative z-10 selection:bg-purple-500/30">
+                          <SimpleMarkdown
+                            text={copilotText}
+                            isTyping={isAnalyzing}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Navigation and Defense */}
                     {onNavigateToNode && (
                       <DetailSection
                         icon={<ExternalLink size={11} />}
-                        title="Navigate to Node"
+                        title="Actions & Navigation"
                       >
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2">
+                          {/* Copilot Action */}
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              onNavigateToNode(alert.source);
+                              if (isAnalyzing) return;
+                              
+                              if (activeCopilotAlertId === alert.id && copilotText !== "") {
+                                // Already analyzed, let them click again to re-analyze by resetting
+                                setCopilotText("");
+                              }
+
+                              setIsAnalyzing(true);
+                              setActiveCopilotAlertId(alert.id);
+                              setCopilotText("");
+
+                              try {
+                                const res = await fetch(
+                                  "http://localhost:8000/v1/copilot/analyze",
+                                  {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      "X-API-Key": "shadow-hunter-dev",
+                                    },
+                                    body: JSON.stringify({
+                                      alert_id: alert.id,
+                                    }),
+                                  },
+                                );
+
+                                if (!res.ok) {
+                                  let errDetail = "Failed to connect to AI Engine.";
+                                  try {
+                                    const errJson = await res.json();
+                                    if (errJson.detail) errDetail = errJson.detail;
+                                  } catch (parseError) {
+                                    console.warn("Could not parse backend error details:", parseError);
+                                  }
+                                  setCopilotText(`⚠️ Backend Error: ${errDetail}`);
+                                  return;
+                                }
+
+                                const reader = res.body.getReader();
+                                const decoder = new TextDecoder();
+
+                                while (true) {
+                                  const { value, done } = await reader.read();
+                                  if (done) break;
+                                  const chunk = decoder.decode(value, {
+                                    stream: true,
+                                  });
+                                  setCopilotText((prev) => prev + chunk);
+                                }
+                              } catch (error) {
+                                console.error(
+                                  "Copilot streaming failed:",
+                                  error,
+                                );
+                                setCopilotText(
+                                  "⚠️ Connection to Hunter AI failed. Please try again.",
+                                );
+                              } finally {
+                                setIsAnalyzing(false);
+                              }
                             }}
-                            className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            disabled={
+                              isAnalyzing && activeCopilotAlertId === alert.id
+                            }
+                            className={`w-full flex items-center justify-center gap-2 text-[10px] font-mono font-bold rounded-lg py-2 px-2 transition-all uppercase tracking-widest ${
+                              isAnalyzing && activeCopilotAlertId === alert.id
+                                ? "text-purple-400 bg-purple-500/10 border border-purple-500/30 opacity-70"
+                                : "text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] glow"
+                            }`}
                           >
-                            <Zap size={10} />
-                            Source
+                            <Zap
+                              size={12}
+                              className={
+                                isAnalyzing && activeCopilotAlertId === alert.id
+                                  ? "animate-pulse"
+                                  : ""
+                              }
+                            />
+                            {isAnalyzing && activeCopilotAlertId === alert.id
+                              ? "Analyzing Incident..."
+                              : "AI Analyze"}
                           </button>
+
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToNode(alert.source);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            >
+                              <Zap size={10} />
+                              View Source
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToNode(alert.target);
+                              }}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            >
+                              <Crosshair size={10} />
+                              View Target
+                            </button>
+                          </div>
+
+                          {/* Kill Switch Button */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigateToNode(alert.target);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-1.5 text-[10px] font-mono font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg py-1.5 px-2 transition-all"
+                            onClick={(e) => handleQuarantine(e, alert.source)}
+                            className="w-full flex items-center justify-center gap-2 text-[10px] font-mono font-bold text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg py-2 px-2 transition-all uppercase tracking-widest mt-1"
                           >
-                            <Crosshair size={10} />
-                            Target
+                            <Lock size={12} className="animate-pulse" />
+                            Quarantine Source Node
                           </button>
                         </div>
                       </DetailSection>
@@ -453,6 +605,77 @@ const formatBytes = (bytes) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Extremely lightweight markdown renderer for the Copilot feature
+const SimpleMarkdown = ({ text, isTyping }) => {
+  if (!text) return null;
+
+  // Basic line-by-line parsing for bold, code, and headers
+  const renderLine = (line, i) => {
+    if (line.startsWith("### ")) {
+      return (
+        <h3 key={i} className="text-xs font-bold text-purple-300 mt-3 mb-1">
+          {line.replace("### ", "")}
+        </h3>
+      );
+    }
+    if (line.startsWith("# ")) {
+      return (
+        <h1
+          key={i}
+          className="text-sm font-bold text-white mb-2 pb-1 border-b border-slate-700/50"
+        >
+          {line.replace("# ", "")}
+        </h1>
+      );
+    }
+    if (line === "---") {
+      return <hr key={i} className="border-slate-700/50 my-2" />;
+    }
+
+    // Parse bold **text** and code `text`
+    let formatted = line;
+    formatted = formatted.replace(
+      /\*\*(.*?)\*\*/g,
+      '<strong class="text-slate-100">$1</strong>',
+    );
+    formatted = formatted.replace(
+      /\*(.*?)\*/g,
+      '<em class="text-slate-400">$1</em>',
+    );
+    formatted = formatted.replace(
+      /`([^`]+)`/g,
+      '<code class="bg-black/50 text-purple-200 px-1 py-0.5 rounded border border-purple-500/20">$1</code>',
+    );
+
+    const isListItem = line.startsWith("- ");
+    const content = isListItem ? formatted.substring(2) : formatted;
+
+    return isListItem ? (
+      <li
+        key={i}
+        className="ml-4 list-disc marker:text-purple-500/50"
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    ) : (
+      <React.Fragment key={i}>
+        <span dangerouslySetInnerHTML={{ __html: content }} />
+        <br />
+      </React.Fragment>
+    );
+  };
+
+  const lines = text.split("\n");
+
+  return (
+    <div>
+      {lines.map((l, i) => renderLine(l, i))}
+      {isTyping && (
+        <span className="inline-block w-1.5 h-3 bg-purple-500/50 animate-pulse ml-1 align-middle"></span>
+      )}
+    </div>
+  );
 };
 
 export default Alerts;

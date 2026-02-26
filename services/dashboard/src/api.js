@@ -6,6 +6,7 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    "X-API-Key": "shadow-hunter-dev", // Required for POST/write operations
   },
 });
 
@@ -163,6 +164,16 @@ export const fetchDlpIncidents = async () => {
   }
 };
 
+export const fetchSoarPlaybooks = async () => {
+  try {
+    const res = await apiClient.get("/policy/soar/playbooks");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch SOAR playbooks:", error);
+    return [];
+  }
+};
+
 export const fetchKillchain = async () => {
   try {
     const res = await apiClient.get("/policy/killchain");
@@ -178,13 +189,14 @@ export const fetchKillchain = async () => {
   }
 };
 
-export const fetchCompliance = async () => {
+// ── MITRE ATT&CK APIs ──────────────────────────────────────────────────
+export const fetchMitreMatrix = async () => {
   try {
-    const res = await apiClient.get("/policy/compliance");
+    const res = await apiClient.get("/mitre/matrix");
     return res.data;
   } catch (error) {
-    console.error("Failed to fetch compliance:", error);
-    return { frameworks: [], overall_score: 0, violations: [] };
+    console.error("Failed to fetch MITRE matrix:", error);
+    return { matrix: [], active_tactics: 0, total_mapped_alerts: 0 };
   }
 };
 
@@ -195,5 +207,74 @@ export const fetchBriefing = async () => {
   } catch (error) {
     console.error("Failed to fetch briefing:", error);
     return { paragraphs: [], generated_at: "", period: "" };
+  }
+};
+
+// ── Defense / Kill-Switch APIs ──────────────────────────────────────────
+export const fetchQuarantinedNodes = async () => {
+  try {
+    const res = await apiClient.get("/defense/quarantined");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch quarantined nodes:", error);
+    return { active_count: 0, active: [], released: [] };
+  }
+};
+
+export const quarantineNode = async (ip, reason = "Manual quarantine") => {
+  try {
+    const res = await apiClient.post("/defense/quarantine", {
+      ip,
+      reason,
+      auto: false,
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Failed to quarantine node:", error);
+    return null;
+  }
+};
+
+export const releaseNode = async (ip) => {
+  try {
+    const res = await apiClient.post("/defense/release", {
+      ip,
+      released_by: "security_analyst",
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Failed to release node:", error);
+    return null;
+  }
+};
+
+// ── Policy & Compliance APIs ──────────────────────────────────────────────
+export const fetchCompliance = async () => {
+  try {
+    const res = await apiClient.get("/compliance/stats"); // 👈 Updated to new Enterprise API
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch compliance:", error);
+    return { overall_compliance_score: 0, frameworks: [], summary: {} };
+  }
+};
+
+export const fetchComplianceViolations = async () => {
+  try {
+    const res = await apiClient.get("/compliance/violations");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch compliance violations:", error);
+    return { total: 0, violations: [] };
+  }
+};
+
+export const fetchComplianceAuditLog = async () => {
+  try {
+    const res = await apiClient.get("/compliance/audit-log");
+    return res.data;
+  } catch (error) {
+    console.error("Failed to fetch audit log:", error);
+    return { total_events: 0, entries: [] };
   }
 };

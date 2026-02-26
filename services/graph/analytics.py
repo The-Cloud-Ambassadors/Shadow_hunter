@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from loguru import logger
 from pkg.core.interfaces import GraphStore
+from pkg.data import idp_mock
 
 
 @dataclass
@@ -37,6 +38,8 @@ class CentralityAlert:
     connected_to: List[str]        # neighbor node IDs
     risk_assessment: str           # Human-readable assessment
     is_infrastructure: bool        # Is this node expected to be central?
+    user_name: Optional[str] = None      # From IdP mapping
+    department: Optional[str] = None     # From IdP / subnet mapping
 
 
 # Known infrastructure nodes that are EXPECTED to have high centrality.
@@ -191,6 +194,13 @@ class GraphAnalyzer:
                     risk_assessment=risk,
                     is_infrastructure=is_infra,
                 )
+                # Enrich with IdP identity
+                profile = idp_mock.resolve(node_id)
+                if profile:
+                    alert.user_name = profile.user_name
+                    alert.department = profile.department
+                else:
+                    alert.department = idp_mock.get_department_for_ip(node_id)
                 alerts.append(alert)
 
                 # Track as known bridge
@@ -224,10 +234,28 @@ class GraphAnalyzer:
             return []
 
     def get_topology_summary(self) -> Dict:
-        """Get a summary of known topology for dashboard display."""
+        """Get a summary of known topology for dashboard display with department grouping."""
+        # Build department → IPs mapping for subnet visualization
+        department_groups = {}
+        for ip, profile in idp_mock.get_all_employees().items():
+            dept = profile.department
+            if dept not in department_groups:
+                department_groups[dept] = []
+            department_groups[dept].append({
+                "ip": ip,
+                "user_name": profile.user_name,
+                "role": profile.role,
+                "is_bridge": ip in self._known_bridges,
+                "centrality": self._known_bridges.get(ip, 0.0),
+            })
+
         return {
             "known_bridges": {
-                node: {"centrality": score}
+                node: {
+                    "centrality": score,
+                    "user_name": getattr(idp_mock.resolve(node), 'user_name', None),
+                    "department": idp_mock.get_department_for_ip(node),
+                }
                 for node, score in sorted(
                     self._known_bridges.items(),
                     key=lambda x: x[1],
@@ -237,4 +265,6 @@ class GraphAnalyzer:
             "total_bridges_detected": len(self._known_bridges),
             "recent_alerts": len(self._alert_history),
             "last_analysis": self._last_analysis_time,
+            "department_groups": department_groups,
+            "departments": idp_mock.get_all_departments(),
         }

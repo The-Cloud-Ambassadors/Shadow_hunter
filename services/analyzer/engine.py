@@ -14,6 +14,8 @@ from services.active_defense.interrogator import ActiveProbe
 from services.graph.analytics import GraphAnalyzer
 from services.response.manager import ResponseManager
 from services.api.routers.policy import add_alert
+from services.intelligence.soar import soar_engine
+from pkg.data.mitre_mapping import mitre_mapper
 
 # Check if intelligence module models exist
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "intelligence", "saved_models")
@@ -136,6 +138,12 @@ class AnalyzerEngine:
             is_anomalous, reason = self.detector.detect(event)
             severity = "HIGH"
 
+            # DLP Override
+            if getattr(event, "dlp_violation", False):
+                is_anomalous = True
+                severity = "CRITICAL"
+                reason = "DLP Violation: Sensitive data detected in payload"
+
             # 5. ML Enhancement — Adds confidence + may catch things rules miss
             ml_verdict = None
             if self.intel_engine and not self.detector.is_whitelisted(event):
@@ -174,6 +182,9 @@ class AnalyzerEngine:
                     "matched_rule": reason,
                     "destination_ip": event.destination_ip,
                 }
+
+                if getattr(event, "dlp_violation", False):
+                    alert["dlp_snippets"] = event.dlp_snippets
 
                 # Add CIDR Threat Intelligence enrichment
                 cidr_match = self.cidr_matcher.lookup(event.destination_ip)
@@ -241,6 +252,11 @@ class AnalyzerEngine:
                         except Exception as e:
                             logger.debug(f"Active probe failed for {probe_target}: {e}")
 
+                # MITRE ATT&CK Framework Mapping
+                mitre_tag = mitre_mapper.map_alert(reason, alert["description"])
+                if mitre_tag:
+                    alert["mitre"] = mitre_tag
+
                 # Broadcast to connected clients
                 from services.api.transceiver import manager
                 await manager.broadcast({
@@ -248,10 +264,26 @@ class AnalyzerEngine:
                     "payload": alert
                 })
 
+                # 7. SOAR PLAYBOOK EVALUATION
+                soar_actions = soar_engine.evaluate(alert)
+                if soar_actions:
+                    alert["soar_actions"] = soar_actions
+                    # Broadcast SOAR action separately for UI toast notifications
+                    for action in soar_actions:
+                        await manager.broadcast({
+                            "type": "auto_response",
+                            "payload": {
+                                "action": "SOAR " + action["action"].upper(),
+                                "ip": event.source_ip,
+                                "reason": f"Playbook Triggered: {action['playbook']}",
+                                "alert_id": alert["id"]
+                            }
+                        })
+
                 add_alert(alert)
 
-                # 8. Auto-Response — block CRITICAL threats
-                if severity == "CRITICAL" and self.response_manager.enabled:
+                # 8. Auto-Response (Legacy hardcoded fallback)
+                if not soar_actions and severity == "CRITICAL" and self.response_manager.enabled:
                     block_result = self.response_manager.block_ip(
                         ip=event.source_ip,
                         reason=reason,

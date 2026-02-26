@@ -54,6 +54,30 @@ try:
 except ImportError as e:
     logger.warning(f"Reporting router not loaded: {e}")
 
+try:
+    from services.api.routers import defense
+    app.include_router(defense.router, prefix="/v1/defense", tags=["Defense"])
+except ImportError as e:
+    logger.warning(f"Defense router not loaded: {e}")
+
+try:
+    from services.api.routers import compliance
+    app.include_router(compliance.router, prefix="/v1/compliance", tags=["Compliance"])
+except ImportError as e:
+    logger.warning(f"Compliance router not loaded: {e}")
+
+try:
+    from services.api.routers import mitre
+    app.include_router(mitre.router, prefix="/v1/mitre", tags=["MITRE"])
+except ImportError as e:
+    logger.warning(f"MITRE router not loaded: {e}")
+
+try:
+    from services.api.routers import copilot
+    app.include_router(copilot.router, prefix="/v1/copilot", tags=["Copilot"])
+except ImportError as e:
+    logger.warning(f"Copilot router not loaded: {e}")
+
 # ── API Key Authentication Middleware ──
 # Protects write operations. Read endpoints remain open.
 API_KEY = os.environ.get("SH_API_KEY", "shadow-hunter-dev")
@@ -61,8 +85,8 @@ OPEN_PATHS = {"/health", "/ws", "/docs", "/openapi.json", "/redoc", "/v1/chat/qu
 
 @app.middleware("http")
 async def api_key_auth(request: Request, call_next):
-    # Allow all GET requests and open paths
-    if request.method == "GET" or request.url.path in OPEN_PATHS:
+    # Allow GET requests, OPTIONS (for CORS preflight), and open paths
+    if request.method in ("GET", "OPTIONS") or request.url.path in OPEN_PATHS:
         return await call_next(request)
 
     # Require API key for write operations

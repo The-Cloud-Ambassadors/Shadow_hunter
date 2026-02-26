@@ -4,6 +4,7 @@ from collections import Counter
 from services.api.dependencies import get_graph_store
 from services.api.routers.policy import get_alerts_store
 from pkg.core.interfaces import GraphStore
+from pkg.data import idp_mock
 
 router = APIRouter()
 
@@ -53,6 +54,12 @@ async def get_risk_scores(store: GraphStore = Depends(get_graph_store)):
         max_score = max(v["weighted_score"] for v in ip_scores.values()) or 1
         for v in ip_scores.values():
             v["risk_pct"] = round((v["weighted_score"] / max_score) * 100)
+            # Identity enrichment via IdP
+            profile = idp_mock.resolve(v["ip"])
+            if profile:
+                v["user_name"] = profile.user_name
+                v["department"] = profile.department
+                v["user_id"] = profile.user_id
     
     # Sort by weighted score descending
     result = sorted(ip_scores.values(), key=lambda x: x["weighted_score"], reverse=True)
