@@ -1,6 +1,6 @@
 # Shadow Hunter: Deep Dive Technical Documentation
 
-This document provides a highly granular, completely exhausted explanation of the Shadow Hunter platform. It covers every minute detail: how data is generated, where the traffic comes from, and exactly how it is processed and analyzed by the rule-based and machine-learning engines.
+This document provides a highly granular, completely exhaustive explanation of the Shadow Hunter platform. It covers every minute detail: how data is generated, where the traffic comes from, exactly how it is processed, enriched by rules and plugins, analyzed by machine learning engines, and actioned upon by the SOAR response mechanisms.
 
 ---
 
@@ -8,7 +8,7 @@ This document provides a highly granular, completely exhausted explanation of th
 
 The system initiates from `run_local.py`, which offers two primary operational modes:
 
-- **LIVE MODE (`--live`)**: Uses `ListenerService` to capture actual network traffic from the host machine using Scapy and Npcap.
+- **LIVE MODE (`--live`)**: Uses `ListenerService` to capture actual network traffic from the host machine using Scapy and Npcap/libpcap.
 - **DEMO MODE**: Uses the `TrafficGenerator` to simulate realistic corporate traffic.
 
 **Initialization Flow:**
@@ -20,7 +20,7 @@ The system initiates from `run_local.py`, which offers two primary operational m
 
 ---
 
-## 2. Traffic Generation (Where Data Comes From)
+## 2. Traffic Generation & Ingestion (Where Data Comes From)
 
 Shadow Hunter ingests network packets unified into `NetworkFlowEvent` objects.
 
@@ -32,40 +32,41 @@ The simulator (`services/simulator/traffic_generator.py`) generates highly reali
 - **Behavior Loop**: Every 2-5 seconds, an employee performs an action.
   - **Normal Web Traffic (60%+)**: Visits standard sites (GitHub, Figma, Google) simulating standard HTTPS traffic (`destination_port=443`, small requests, large responses).
   - **Internal Server Traffic**: Occasionally simulates internal subnet communication (e.g., reaching a Jira server or Database).
-  - **Shadow AI Temptation (The Threat)**: Depending on their role (Interns 30%, Data Scientists 25%), they have a probability of "sneaking" unauthorized AI usage. This generates events with destination domains mapped to known AI tool IPs (e.g., ChatGPT, Copilot, Cursor).
+  - **Shadow AI Temptation (The Threat)**: Depending on their role, they have a probability of "sneaking" unauthorized AI usage. This generates events with destination domains mapped to known AI tool IPs (e.g., ChatGPT, Copilot, Cursor).
 
 ### B. Live Mode (Real Traffic)
 
-- Powered by `ListenerService` (`services/listener/main.py`), utilizing Scapy.
+- Powered by `ListenerService` (`services/listener/main.py`), utilizing Scapy on raw sockets.
 - It captures live packets on the network interface and runs them through `PacketProcessor`.
-- The processor extracts IPs, ports, protocols, byte sizes, and metadata (like DNS SNI and JA3 fingerprints), condensing them into raw `NetworkFlowEvent` payloads.
+- The processor extracts IPs, ports, protocols, byte sizes, and deep-packet metadata (like DNS SNI, HTTP headers, and JA3 TLS fingerprints), condensing them into raw `NetworkFlowEvent` payloads.
 
-**The Output**: Regardless of the source, `NetworkFlowEvent` payloads are published to the `MemoryBroker` under the topic `sh.telemetry.traffic.v1`.
+**The Output**: Regardless of the source, `NetworkFlowEvent` payloads are published to the async `MemoryBroker`.
 
 ---
 
 ## 3. The Processing Pipeline (`AnalyzerEngine`)
 
-The `AnalyzerEngine` (`services/analyzer/engine.py`) sits in the middle. It subscribes to the broker and acts on every single network flow event.
+The `AnalyzerEngine` (`services/analyzer/engine.py`) intercepts every single network flow event and processes it through a strict pipeline.
 
 ### Step 3.1: Event Parsing & Basic Enrichment
 
-- Converts raw dictionaries into `NetworkFlowEvent` schemas.
-- **Node Classification**: Determines if `source_ip` and `destination_ip` are `internal` or `external`. If the destination matches recognized AI domains, it is reclassified as `shadow`.
-- **GeoIP Lookup**: If the destination is external, it queries `GeoIPService` to append geographical context to the `destination_ip` node.
+- Converts raw dictionaries into validated `NetworkFlowEvent` schemas.
+- **Node Classification**: Determines if `source_ip` and `destination_ip` are `internal` or `external`. If the destination matches recognized AI domains, it is flagged as `shadow`.
+- **GeoIP Lookup**: Appends geographical context to the `destination_ip` node.
 
 ### Step 3.2: Graph Injection
 
-- Graph edges and nodes are upserted efficiently using `asyncio.gather`.
+- Graph edges and nodes are upserted efficiently.
 - **Nodes Created**: `source_id` and `destination_id`.
 - **Edge Created**: `TALKS_TO` containing properties like `protocol`, `dst_port`, `byte_count`, and `last_seen`.
 
-### Step 3.3: Static Threat Intelligence Enrichments
+### Step 3.3: Static Threat Intelligence & Plugins (`services/analyzer/plugins`)
 
-If anomalous activity is detected, static enrichment occurs before alerting:
+Before hitting ML, traffic is evaluated by absolute intelligence plugins:
 
-- **CIDR Threat Intelligence (`CIDRMatcher`)**: Checks the destination IP against a local database of known provider IP ranges (e.g., Microsoft Azure, Cloudflare) and retrieves compliance risk, provider name, and service type.
-- **JA3 Fingerprint Matching (`JA3Matcher`)**: Evaluates the TLS JA3 hash (if present) against known malicious or unauthorized client fingerprints. It cross-references the JA3 hash with the `User-Agent` to detect **Spoofing** (e.g., a Python script pretending to be a Chrome browser).
+- **CIDR Threat Intelligence (`cidr_intel.py`)**: Checks the destination IP against a local database of known provider IP ranges (e.g., Cloudflare, Azure, AWS) and mapping them to known enterprise or shadow services.
+- **JA3 Fingerprint Matching (`ja3_plugin.py`)**: Evaluates the TLS JA3 hash against a database of known malicious or unsanctioned client fingerprints. Crucially, it detects **Spoofing**—if the traffic says it is Chrome (`User-Agent`) but the JA3 signature belongs to a raw Python `requests` library, it instantly triggers a critical alert.
+- **Core Heuristics (`core_heuristics.py`)**: Acts as a first-pass rule engine to drop obvious noise and flag deterministic protocol abnormalities.
 
 ---
 
@@ -73,64 +74,67 @@ If anomalous activity is detected, static enrichment occurs before alerting:
 
 If `use_ml=True`, the Analyzer pipes the event into the `IntelligenceEngine` (`services/intelligence/engine.py`).
 
-### A. Feature Extraction (`FeatureExtractor`)
+### A. Feature Extraction
 
-The `NetworkFlowEvent` is stripped of raw IPs and converted into a numeric NumPy feature vector representing byte ratios, port classifications, and payload structures.
+The `NetworkFlowEvent` is converted into a numeric NumPy feature vector representing byte ratios, port classifications, and payload structures.
 
-### B. Session Tracking (`SessionAnalyzer`)
+### B. Session Tracking
 
-A sliding 60-minute window tracks the behavioral history of the `source_ip`. It calculates cumulative bytes, request frequency, and checks if data exfiltration patterns match against time.
+A sliding **60-minute window tracker** tracks the behavioral history of the `source_ip`. It calculates cumulative bytes, request frequency, and checks if time-series data exfiltration patterns match against known thresholds.
 
 ### C. ML Inference (The Models)
 
-The extracted feature vector is passed to three concurrent models:
+The feature vector is passed to three concurrent models:
 
-1. **`AnomalyModel` (Isolation Forest)**: Looks for generalized structural outliers in network flow sizes/ratios. It produces a negative-to-positive float score. Lower than `-0.2` triggers a flag.
-2. **`TrafficClassifier` (Random Forest Classifier)**: Specifically trained to categorize flows into classes (`normal`, `suspicious`, `shadow_ai`). It returns the classification alongside a statistical probability (`confidence`).
-3. **`ShadowAutoencoder` (Deep Learning / TensorFlow)**: Reconstructs the input feature vector. If the `reconstruction_error` is higher than the 95th percentile threshold learned during training, the event is flagged. This catches completely novel zero-day shadow tools.
+1. **`AnomalyModel` (Isolation Forest)**: Looks for generalized structural outliers. Scored between -1.0 and 1.0 (Lower than `-0.2` triggers a flag).
+2. **`TrafficClassifier` (Random Forest Classifier)**: Specifically trained to categorize flows into classes (`normal`, `suspicious`, `shadow_ai`). It returns the classification alongside a probability (`confidence`).
+3. **`ShadowAutoencoder` (Deep Learning / TensorFlow)**: Reconstructs the input feature vector. If the `reconstruction_error` is higher than the 95th percentile threshold learned during training, the event is flagged, catching novel zero-day shadow tools.
 
-**Verdict Aggregation:** The engine combines these results into a unified `risk_score` (0.0 to 1.0) and generates `reasons` string arrays to explain _why_ it flagged the traffic.
-
-**SHAP Explanations**: If the risk score exceeds `0.7`, the system utilizes SHAP (SHapley Additive exPlanations) to identify exactly which feature (e.g., "high bytes_sent on port 443") influenced the Random Forest the most.
+**Verdict Aggregation:** The engine unifies these results into a `risk_score` (0.0 to 1.0) and generates `reasons` string arrays to explain the flag.
 
 ---
 
 ## 5. Active Defense & Interrogation (`ActiveProbe`)
 
-When the main engine generates a `CRITICAL` or `HIGH` severity alert, it delegates to `ActiveProbe` (`services/active_defense/interrogator.py`) to actively poke the suspicious destination IP.
+When the main engine generates a `CRITICAL` or `HIGH` severity alert, it delegates to `ActiveProbe` (`services/active_defense/interrogator.py`) to actively probe the suspicious destination IP.
 
 ### Protective Guards
+- Never probes internal IP ranges (`10.0.0.0/8`, `192.168.0.0/16`, etc.).
+- Strict rate-limiting and a 5-minute cooldown per target IP to prevent triggering external IDS.
 
-- Never probes internal IP ranges.
-- Capped at maximum probes per minute to prevent generating outbound flood patterns.
-- Applies a strict 5-minute cooldown per target IP.
+### Probing Strategy
+1. **HTTP OPTIONS Check**: Analyzes rate-limit headers or server attributes typical of AI infrastructure.
+2. **AI Endpoint Verification**: Attempts `GET` requests against known AI paths (`/v1/models`, `/api/generate`) looking for terminology matching AI generation layers or 401 Unauthorized API responses.
 
-### Probe 1: HTTP OPTIONS
-
-The probe does a lightweight `OPTIONS` request. It analyzes the specific headers returned (e.g., `x-ratelimit-limit`, `x-request-id`, or specific Server attributes) to identify AI-API infrastructure patterns.
-
-### Probe 2: AI Endpoints
-
-If the `OPTIONS` check is inconclusive, the interrogator attempts GET requests against known AI API paths (e.g., `/v1/models` or `/api/generate`). It looks for a JSON response containing terminology like `"model"`, `"completion"`, or a HTTP 401 Authorization request.
-
-**Result**: Active Interrogation intelligence is glued onto the final alert payload, changing a "Suspicious HTTPS Outbound" alert into a "CONFIRMED AI API Hit".
+**Result**: Changes speculative alerts ("Suspicious HTTPS Outbound") into confirmed factual alerts ("CONFIRMED AI API Hit").
 
 ---
 
 ## 6. Graph Topology Analytics (`GraphAnalyzer`)
 
-Parallel to the real-time event flow, the `GraphAnalyzer` (`services/graph/analytics.py`) runs periodically (every ~60 seconds).
-It takes the entire graph state and calculates the **Betweenness Centrality** of every node.
+Parallel to real-time events, the `GraphAnalyzer` (`services/graph/analytics.py`) runs asynchronously mapping network traffic as a 3D Force-Directed Graph.
 
-- **Objective**: Detect Lateral Movement.
-- **Mechanism**: If a standard internal workstation suddenly maintains a top 1% centrality score matching that of a router, and communicates with heavily shielded subnets, the system fires a "Suspicious Bridge Node" lateral movement alert.
-- **Whitelists**: Centrality logic aggressively whitelists recognized Gateways (e.g., `192.168.1.1` or `8.8.8.8`).
+- **Objective**: Detect stealthy Lateral Movement and internal bridge nodes.
+- **Mechanism**: Calculates **Betweenness Centrality** of every node. If a standard workstation suddenly acquires a high centrality score (acting like a router) and connects segregated subnets, it fires a "Suspicious Bridge Node" lateral movement alert.
+- **Whitelists**: Centrality logic aggressively whitelists recognized Gateways avoiding false positives.
 
 ---
 
-## 7. Reporting and Response (`ResponseManager` & `Transceiver`)
+## 7. Security Orchestration & Automated Response (SOAR)
 
-Once an alert is completely enriched (Rules + ML + JA3 + CIDR + Graph + Probe), two things happen:
+Once an alert is completely enriched, the system engages the automated response tier (`services/intelligence/soar.py` and `services/response/manager.py`).
 
-1. **Auto-Response**: If the `ResponseManager` is enabled and the alert is `CRITICAL`, it automatically issues OS-level blocking commands to isolate the internal IP.
-2. **Presentation**: The dictionary payload is dispatched to the FastAPI WebSocket router (`services/api/transceiver.py`), broadcasting in real-time to the React frontend dashboard where it is rendered to the user.
+### 7.1 SOAR Engine (`soar.py`)
+ Evaluates the final alert payload against predefined Playbooks:
+- **Playbook 1 (Auto-Quarantine Critical Threats)**: Immediately isolates any node generating a `CRITICAL` severity event (like a DLP violation).
+- **Playbook 2 (Block Active Shadow AI Anomalies)**: Blocks nodes flagged with `HIGH` severity and confirmed `shadow_ai` classification.
+
+### 7.2 Response Manager (`manager.py`)
+Executes the physical isolation logic initiated by the SOAR engine:
+- Maintains an active **Blocklist** of quarantined IPs in-memory (simulating a physical firewall integration).
+- **Time-to-Live (TTL)**: Auto-blocks expire after a configured time (e.g., 3600 seconds) to prevent permanent accidental lockdown.
+- **Fail-Safes**: Implements an un-bypassable whitelist preventing the system from ever blocking essential infra (`8.8.8.8`, `192.168.1.1`, gateways, and multicast addresses).
+- **Audit Logging**: maintains a strict, API-exposed audit log of all automated blocking and unblocking operations.
+
+### 7.3 Frontend Presentation (`transceiver.py`)
+The dictionary payload, now including its block status, is dispatched to the FastAPI WebSocket router (`services/api/transceiver.py`), broadcasting in real-time to the React frontend dashboard where it updates the global state.
