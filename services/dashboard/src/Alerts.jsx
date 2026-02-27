@@ -66,21 +66,21 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
 
   const severityConfig = {
     HIGH: {
-      stripe: "bg-red-500 shadow-[0_0_10px_#ef4444]",
-      badge: "bg-red-950/50 text-red-500 border-red-500/30",
-      glow: "shadow-[0_0_20px_rgba(239,68,68,0.15)]",
+      stripe: "bg-red-500",
+      badge: "bg-red-500/10 text-red-500 border-red-500/30",
+      glow: "shadow-md",
       dot: "bg-red-500",
     },
     MEDIUM: {
       stripe: "bg-amber-500",
-      badge: "bg-amber-950/50 text-amber-500 border-amber-500/30",
-      glow: "shadow-[0_0_20px_rgba(245,158,11,0.15)]",
+      badge: "bg-amber-500/10 text-amber-500 border-amber-500/30",
+      glow: "shadow-md",
       dot: "bg-amber-500",
     },
     LOW: {
       stripe: "bg-blue-500",
-      badge: "bg-blue-950/50 text-blue-400 border-blue-500/30",
-      glow: "shadow-[0_0_20px_rgba(59,130,246,0.15)]",
+      badge: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+      glow: "shadow-md",
       dot: "bg-blue-500",
     },
   };
@@ -98,7 +98,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
   return (
     <div className="h-full flex flex-col bg-sh-panel rounded-2xl border border-sh-border shadow-xl overflow-hidden relative">
       {/* Header */}
-      <div className="p-4 border-b border-sh-border bg-slate-900/50 backdrop-blur flex justify-between items-center flex-none">
+      <div className="p-4 border-b border-sh-border bg-sh-surface backdrop-blur flex justify-between items-center flex-none">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-red-400 animate-pulse" />
           <span className="font-bold text-sm tracking-wider text-slate-200 uppercase">
@@ -109,13 +109,13 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
           {onExport && (
             <button
               onClick={() => onExport(filtered)}
-              className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400 hover:text-white transition-colors bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded border border-slate-700 hover:border-slate-500"
+              className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-sh-text-muted hover:text-sh-text transition-colors bg-sh-surface hover:bg-sh-hover px-2 py-1 rounded border border-sh-border hover:border-sh-border"
             >
               <Download size={10} />
               CSV
             </button>
           )}
-          <span className="text-[10px] font-mono text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+          <span className="text-[10px] font-mono text-sh-text-muted bg-sh-surface px-2 py-0.5 rounded-full border border-sh-border">
             LIVE
           </span>
         </div>
@@ -146,10 +146,10 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                     setActiveCopilotAlertId(null);
                   }
                 }}
-                className={`group relative bg-slate-900/80 hover:bg-slate-800 p-3 rounded-lg border transition-all cursor-pointer ${
+                className={`group relative bg-sh-panel hover:bg-sh-hover p-3 rounded-lg border transition-all cursor-pointer ${
                   isSelected
-                    ? `border-slate-500 ${sev.glow}`
-                    : "border-sh-border hover:border-slate-600"
+                    ? `border-sh-text-dim ${sev.glow}`
+                    : "border-sh-border hover:border-sh-text-dim"
                 }`}
               >
                 {/* Severity Stripe */}
@@ -182,7 +182,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                   </div>
 
                   {alert.source && (
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 bg-slate-950/50 p-1.5 rounded border border-slate-800/50">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-sh-text-muted bg-sh-surface p-1.5 rounded border border-sh-border">
                       <span className="text-blue-400">{alert.source}</span>
                       <ArrowRight className="w-3 h-3 text-slate-600" />
                       <span className="text-red-400">{alert.target}</span>
@@ -239,7 +239,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                       icon={<Crosshair size={11} />}
                       title="Detection"
                     >
-                      <div className="text-[11px] font-mono text-slate-300 bg-slate-950/50 p-2 rounded border border-sh-border/30 leading-relaxed">
+                      <div className="text-[11px] font-mono text-sh-text-secondary bg-sh-surface p-2 rounded border border-sh-border leading-relaxed">
                         {alert.matched_rule || alert.description}
                       </div>
                     </DetailSection>
@@ -250,7 +250,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                         icon={<Lock size={11} />}
                         title="JA3 Cryptographic Identity"
                       >
-                        <div className="space-y-2 bg-slate-950/50 p-2 rounded border border-sh-border/30">
+                        <div className="space-y-2 bg-sh-surface p-2 rounded border border-sh-border">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono text-slate-500">Hash</span>
                             <span className="text-[10px] font-mono text-slate-300">{alert.ja3_intel.ja3_hash || "—"}</span>
@@ -279,7 +279,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                         icon={<Activity size={11} />}
                         title="Active Defense Interrogation"
                       >
-                        <div className="space-y-2 bg-slate-950/50 p-2 rounded border border-sh-border/30">
+                        <div className="space-y-2 bg-sh-surface p-2 rounded border border-sh-border">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono text-slate-500">Probe Status</span>
                             <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${alert.active_probe.confirmed_ai ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
@@ -293,7 +293,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                             </div>
                           )}
                           {(alert.active_probe.options_probe?.ai_indicators?.length > 0 || alert.active_probe.ai_probe?.ai_indicators?.length > 0) && (
-                            <div className="mt-1 pt-1 border-t border-slate-800">
+                            <div className="mt-1 pt-1 border-t border-sh-border">
                               <div className="text-[9px] font-mono text-slate-500 mb-1">CORS & Indicators Extracted:</div>
                               <div className="flex flex-wrap gap-1">
                                 {[...(alert.active_probe.options_probe?.ai_indicators || []), ...(alert.active_probe.ai_probe?.ai_indicators || [])].map((ind, idx) => (
@@ -441,7 +441,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
 
                     {/* AI Copilot Streaming View - Moved up for visibility */}
                     {(activeCopilotAlertId === alert.id || (copilotText && activeCopilotAlertId === alert.id)) && (
-                      <div className="p-3 bg-slate-950/90 border border-purple-500/40 rounded-xl relative overflow-hidden group shadow-lg shadow-purple-900/10 my-2">
+                      <div className="p-3 bg-sh-surface border border-purple-500/40 rounded-xl relative overflow-hidden group shadow-lg shadow-purple-900/10 my-2">
                         <div className="absolute inset-0 bg-linear-to-b from-purple-500/5 to-transparent pointer-events-none"></div>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
                         <div className="flex items-center gap-2 mb-3 border-b border-purple-500/30 pb-2 relative">
@@ -608,7 +608,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                                 e.stopPropagation();
                                 setSelectedAlert(ra);
                               }}
-                              className="flex items-center gap-2 text-[10px] font-mono text-slate-400 bg-slate-950/50 border border-sh-border/30 rounded px-2 py-1 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                              className="flex items-center gap-2 text-[10px] font-mono text-sh-text-muted bg-sh-surface border border-sh-border rounded px-2 py-1 hover:bg-sh-hover cursor-pointer transition-colors"
                             >
                               <span
                                 className={`w-1.5 h-1.5 rounded-full flex-none ${severityConfig[ra.severity]?.dot || "bg-slate-500"}`}
@@ -654,7 +654,7 @@ const DetailSection = ({ icon, title, children }) => (
 );
 
 const MetaField = ({ label, value }) => (
-  <div className="bg-slate-950/50 border border-sh-border/30 rounded px-2 py-1">
+  <div className="bg-sh-surface border border-sh-border rounded px-2 py-1">
     <div className="text-[8px] font-mono text-slate-600 uppercase tracking-wider">
       {label}
     </div>
