@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from contextlib import asynccontextmanager
@@ -116,6 +117,29 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
+# ── Serve React Dashboard (Production / Cloud Run) ──
+# When the Dockerfile builds the frontend, it places the output in /app/static.
+# This block serves those files so the dashboard loads from the same URL as the API.
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "static")
+
+if os.path.isdir(STATIC_DIR):
+    logger.info(f"Serving React dashboard from {STATIC_DIR}")
+    # Mount static assets (JS, CSS, images) under /assets
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all route: serve index.html for any non-API path (SPA routing)."""
+        index_file = os.path.join(STATIC_DIR, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        return JSONResponse(status_code=404, content={"detail": "Dashboard not found"})
+else:
+    logger.info("No static directory found — frontend must be served separately (dev mode)")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
