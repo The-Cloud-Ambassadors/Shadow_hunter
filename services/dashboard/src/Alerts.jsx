@@ -489,7 +489,7 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
 
                               try {
                                 const res = await fetch(
-                                  "http://localhost:8000/v1/copilot/analyze",
+                                  "/v1/copilot/analyze",
                                   {
                                     method: "POST",
                                     headers: {

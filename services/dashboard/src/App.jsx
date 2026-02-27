@@ -168,7 +168,9 @@ function App() {
     let reconnectTimeout = null;
 
     const connect = () => {
-      ws = new WebSocket("ws://localhost:8000/ws");
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = import.meta.env.VITE_API_URL ? 'localhost:8000' : window.location.host;
+      ws = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
 
       ws.onopen = () => {
         console.log("🟢 Connected to Real-Time Intelligence Feed");
@@ -310,7 +312,7 @@ function App() {
                         e.target.disabled = true;
                         try {
                           const res = await fetch(
-                            "http://localhost:8000/v1/chat/query",
+                            "/v1/chat/query",
                             {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
