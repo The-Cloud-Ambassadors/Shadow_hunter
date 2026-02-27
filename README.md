@@ -74,6 +74,10 @@ We utilize a triad of specialized models to ensure comprehensive coverage:
 git clone https://github.com/The-Cloud-Ambassadors/Shadow_hunter.git
 cd Shadow_hunter
 
+# It is recommended to create a virtual environment first:
+# python -m venv venv
+# venv\Scripts\activate.bat (Windows) OR source venv/bin/activate (Mac/Linux)
+
 # Install Backend Dependencies
 pip install -r requirements.txt
 
@@ -88,7 +92,7 @@ npm install
 This mode generates realistic virtual employee traffic, perfect for demonstrating capabilities without requiring a live network setup.
 
 ```bash
-# Terminal 1 - Start the Backend AI Engine
+# Terminal 1 - Start the Backend AI Engine (from project root)
 python run_local.py
 
 # Terminal 2 - Start the Dashboard
@@ -100,6 +104,7 @@ npm run dev
 To monitor your actual local network interface in real-time.
 
 ```bash
+# Note: You must run this command with Administrator/sudo privileges
 python run_local.py --live
 ```
 
