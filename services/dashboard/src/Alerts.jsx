@@ -244,6 +244,68 @@ const Alerts = ({ searchQuery, onExport, onNavigateToNode }) => {
                       </div>
                     </DetailSection>
 
+                    {/* Cryptographic Identity (JA3) */}
+                    {alert.ja3_intel && (
+                      <DetailSection
+                        icon={<Lock size={11} />}
+                        title="JA3 Cryptographic Identity"
+                      >
+                        <div className="space-y-2 bg-slate-950/50 p-2 rounded border border-sh-border/30">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-slate-500">Hash</span>
+                            <span className="text-[10px] font-mono text-slate-300">{alert.ja3_intel.ja3_hash || "—"}</span>
+                          </div>
+                          {alert.ja3_intel.client_name && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono text-slate-500">Known Client</span>
+                              <span className="text-[10px] font-mono text-blue-400">{alert.ja3_intel.client_name}</span>
+                            </div>
+                          )}
+                          {alert.ja3_intel.spoofing && (
+                            <div className="mt-1 p-1 bg-red-500/10 border border-red-500/30 rounded">
+                              <div className="text-[10px] font-bold text-red-500 uppercase">⚠️ Client Spoofing Detected</div>
+                              <div className="text-[9px] text-red-400/80 mt-0.5">
+                                User-Agent claimed {alert.ja3_intel.spoofing.user_agent}, but TLS handshake is structurally identical to {alert.ja3_intel.spoofing.ja3_client}.
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DetailSection>
+                    )}
+
+                    {/* Active Interrogation Probe */}
+                    {alert.active_probe && (
+                      <DetailSection
+                        icon={<Activity size={11} />}
+                        title="Active Defense Interrogation"
+                      >
+                        <div className="space-y-2 bg-slate-950/50 p-2 rounded border border-sh-border/30">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-slate-500">Probe Status</span>
+                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${alert.active_probe.confirmed_ai ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+                              {alert.active_probe.confirmed_ai ? "CONFIRMED AI ENDPOINT" : "BENIGN SIGNAL"}
+                            </span>
+                          </div>
+                          {alert.active_probe.options_probe?.server && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono text-slate-500">Target Server</span>
+                              <span className="text-[10px] font-mono text-slate-300 truncate">{alert.active_probe.options_probe.server}</span>
+                            </div>
+                          )}
+                          {(alert.active_probe.options_probe?.ai_indicators?.length > 0 || alert.active_probe.ai_probe?.ai_indicators?.length > 0) && (
+                            <div className="mt-1 pt-1 border-t border-slate-800">
+                              <div className="text-[9px] font-mono text-slate-500 mb-1">CORS & Indicators Extracted:</div>
+                              <div className="flex flex-wrap gap-1">
+                                {[...(alert.active_probe.options_probe?.ai_indicators || []), ...(alert.active_probe.ai_probe?.ai_indicators || [])].map((ind, idx) => (
+                                  <span key={idx} className="text-[8px] font-mono font-bold text-purple-400 bg-purple-500/10 border border-purple-500/30 rounded px-1">{ind}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DetailSection>
+                    )}
+
                     {/* ML Intelligence (conditional) */}
                     {alert.ml_classification && (
                       <DetailSection

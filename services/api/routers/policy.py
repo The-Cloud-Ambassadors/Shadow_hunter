@@ -494,7 +494,7 @@ async def get_timeline():
     alerts = _alerts_store
 
     # Bucket alerts by minute
-    buckets = defaultdict(lambda: {"HIGH": 0, "MEDIUM": 0, "LOW": 0, "total": 0})
+    buckets = defaultdict(lambda: {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "total": 0})
     protocols = set()
     sources = set()
 
