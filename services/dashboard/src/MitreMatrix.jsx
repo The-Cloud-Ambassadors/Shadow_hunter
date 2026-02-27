@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { fetchMitreMatrix } from "./api";
 import { Layers, AlertTriangle, ShieldAlert } from "lucide-react";
 
-// Severity to aesthetic classes
+// Severity to aesthetic classes — using theme-aware colors
 const SEV_BG = {
-  CRITICAL: "bg-red-500/20 border-red-500/50",
-  HIGH: "bg-orange-500/20 border-orange-500/50",
-  MEDIUM: "bg-amber-500/20 border-amber-500/50",
-  LOW: "bg-blue-500/20 border-blue-500/50",
+  CRITICAL: "bg-red-500/15 border-red-500/30",
+  HIGH: "bg-orange-500/15 border-orange-500/30",
+  MEDIUM: "bg-amber-500/15 border-amber-500/30",
+  LOW: "bg-blue-500/15 border-blue-500/30",
 };
 const SEV_TEXT = {
   CRITICAL: "text-red-400",
@@ -38,7 +38,7 @@ const MitreMatrix = () => {
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-6 text-slate-500 font-mono text-sm relative">
+      <div className="h-full flex flex-col items-center justify-center p-6 text-sh-text-muted font-mono text-sm relative">
         <Layers className="w-12 h-12 mb-4 animate-pulse opacity-50" />
         LOADING MITRE ATT&amp;CK MATRIX...
       </div>
@@ -50,13 +50,13 @@ const MitreMatrix = () => {
   return (
     <div className="h-full flex flex-col p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-none border-b border-slate-700/50 pb-3 relative">
+      <div className="flex items-center justify-between mb-4 flex-none border-b border-sh-border pb-3 relative">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
             <Layers className="w-4 h-4 text-teal-400" />
           </div>
           <div>
-            <h2 className="text-sm font-bold font-mono text-slate-200 tracking-widest uppercase flex items-center gap-2">
+            <h2 className="text-sm font-bold font-mono text-sh-text tracking-widest uppercase flex items-center gap-2">
               MITRE ATT&amp;CK Framework
               {total_mapped_alerts > 0 && (
                 <span className="flex h-2 w-2 relative">
@@ -65,7 +65,7 @@ const MitreMatrix = () => {
                 </span>
               )}
             </h2>
-            <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+            <div className="text-[10px] font-mono text-sh-text-muted mt-0.5">
               Tactics actively observed:{" "}
               <span className="text-teal-400">{active_tactics}</span> | Mapped
               events:{" "}
@@ -85,22 +85,22 @@ const MitreMatrix = () => {
                 key={tactic.tactic}
                 className={`w-[260px] h-full flex flex-col rounded-xl border transition-all duration-500 overflow-hidden ${
                   isActive
-                    ? "bg-sh-panel border-teal-500/30 shadow-[0_0_15px_rgba(20,184,166,0.05)]"
-                    : "bg-slate-900/30 border-slate-800/50 opacity-60"
+                    ? "bg-sh-panel border-teal-500/30"
+                    : "bg-sh-surface border-sh-border opacity-60"
                 }`}
               >
                 {/* Column Header */}
                 <div
-                  className={`p-3 border-b ${isActive ? "border-teal-500/20 bg-teal-950/20" : "border-slate-800/50 bg-slate-900/50"}`}
+                  className={`p-3 border-b ${isActive ? "border-teal-500/20 bg-teal-500/5" : "border-sh-border bg-sh-surface"}`}
                 >
                   <div className="flex justify-between items-center">
                     <h3
-                      className={`font-mono text-xs font-bold uppercase tracking-widest truncate max-w-[80%] ${isActive ? "text-teal-100" : "text-slate-500"}`}
+                      className={`font-mono text-xs font-bold uppercase tracking-widest truncate max-w-[80%] ${isActive ? "text-sh-text" : "text-sh-text-dim"}`}
                     >
                       {tactic.tactic}
                     </h3>
                     {isActive && (
-                      <span className="text-[10px] font-mono bg-teal-500/20 text-teal-400 px-1.5 py-0.5 rounded border border-teal-500/30">
+                      <span className="text-[10px] font-mono bg-teal-500/15 text-teal-400 px-1.5 py-0.5 rounded border border-teal-500/30">
                         {tactic.total_hits}
                       </span>
                     )}
@@ -110,12 +110,11 @@ const MitreMatrix = () => {
                 {/* Techniques List */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                   {!isActive ? (
-                    <div className="flex h-full items-center justify-center text-slate-700 font-mono text-[9px] uppercase tracking-widest text-center px-4 leading-normal">
+                    <div className="flex h-full items-center justify-center text-sh-text-dim font-mono text-[9px] uppercase tracking-widest text-center px-4 leading-normal">
                       No mapped activity
                     </div>
                   ) : (
                     tactic.techniques.map((tech) => {
-                      // Determine max severity of alerts in this technique
                       let maxSevStr = "LOW";
                       if (tech.alerts.some((a) => a.severity === "CRITICAL"))
                         maxSevStr = "CRITICAL";
@@ -130,10 +129,10 @@ const MitreMatrix = () => {
                       return (
                         <div
                           key={tech.id}
-                          className={`p-2 rounded-lg border ${bgClass} shadow-sm backdrop-blur-sm relative overflow-hidden group`}
+                          className={`p-2 rounded-lg border ${bgClass} shadow-sm relative overflow-hidden group`}
                         >
                           <div
-                            className={`absolute top-0 left-0 w-1 h-full ${bgClass.split(" ")[0].replace("/20", "")}`}
+                            className={`absolute top-0 left-0 w-1 h-full ${bgClass.split(" ")[0].replace("/15", "")}`}
                           ></div>
 
                           <div className="pl-3">
@@ -144,14 +143,14 @@ const MitreMatrix = () => {
                                 {tech.id}
                               </span>
                               <span
-                                className={`text-[9px] font-mono bg-black/40 px-1 py-0.5 rounded ${txtClass} border border-slate-700/50 flex items-center gap-1`}
+                                className={`text-[9px] font-mono bg-sh-surface px-1 py-0.5 rounded ${txtClass} border border-sh-border flex items-center gap-1`}
                               >
                                 <AlertTriangle size={8} />
                                 {tech.hits}
                               </span>
                             </div>
 
-                            <div className="text-xs text-slate-200 font-semibold mb-2 leading-tight">
+                            <div className="text-xs text-sh-text font-semibold mb-2 leading-tight">
                               {tech.name}
                             </div>
 
@@ -160,7 +159,7 @@ const MitreMatrix = () => {
                               {tech.alerts.slice(0, 2).map((a, i) => (
                                 <div
                                   key={i}
-                                  className="text-[9px] font-mono bg-black/30 border border-slate-700/50 rounded p-1 truncate text-slate-400"
+                                  className="text-[9px] font-mono bg-sh-surface border border-sh-border rounded p-1 truncate text-sh-text-muted"
                                 >
                                   <span className={SEV_TEXT[a.severity]}>
                                     {a.severity.charAt(0)}
@@ -169,7 +168,7 @@ const MitreMatrix = () => {
                                 </div>
                               ))}
                               {tech.alerts.length > 2 && (
-                                <div className="text-[8px] font-mono text-slate-500 pl-1 uppercase tracking-widest pt-0.5">
+                                <div className="text-[8px] font-mono text-sh-text-dim pl-1 uppercase tracking-widest pt-0.5">
                                   + {tech.alerts.length - 2} more events
                                 </div>
                               )}

@@ -419,6 +419,260 @@ canvas,
 }
 
 /* ═══════════════════════════════════════════════════
+   LIGHT MODE — Component-Level Fixes
+   (MITRE Matrix, Alerts, KillChain Cards)
+   ═══════════════════════════════════════════════════ */
+
+/* ── Alert Card Backgrounds ── */
+:root.light .bg-slate-900\/80 {
+  background-color: #ffffff !important;
+}
+:root.light .hover\:bg-slate-800:hover {
+  background-color: #f8fafc !important;
+}
+:root.light .bg-slate-800\/40 {
+  background-color: rgba(241, 245, 249, 0.6) !important;
+}
+
+/* ── Severity Badges — crispy pastel backgrounds ── */
+:root.light .bg-red-950\/50 {
+  background-color: rgba(254, 226, 226, 0.8) !important; /* red-100 */
+}
+:root.light .bg-amber-950\/50 {
+  background-color: rgba(254, 243, 199, 0.8) !important; /* amber-100 */
+}
+:root.light .bg-blue-950\/50 {
+  background-color: rgba(219, 234, 254, 0.8) !important; /* blue-100 */
+}
+
+/* ── Inner IP address pills ── */
+:root.light .bg-slate-950\/50 {
+  background-color: #f1f5f9 !important; /* slate-100 */
+}
+:root.light .bg-slate-950 {
+  background-color: #f8fafc !important; /* slate-50 */
+}
+
+/* ── MITRE Matrix — Dark inner elements ── */
+:root.light .bg-black\/30 {
+  background-color: rgba(241, 245, 249, 0.9) !important; /* slate-100 */
+}
+:root.light .bg-black\/40 {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+}
+
+/* ── MITRE Teal Headers ── */
+:root.light .bg-teal-950\/20 {
+  background-color: rgba(204, 251, 241, 0.5) !important; /* teal-100 */
+}
+:root.light .border-teal-500\/20 {
+  border-color: rgba(20, 184, 166, 0.25) !important;
+}
+:root.light .border-teal-500\/30 {
+  border-color: rgba(20, 184, 166, 0.3) !important;
+}
+:root.light .text-teal-100 {
+  color: #0d9488 !important; /* teal-600 */
+}
+:root.light .text-teal-400 {
+  color: #0d9488 !important;
+}
+:root.light .bg-teal-500\/10 {
+  background-color: rgba(204, 251, 241, 0.6) !important;
+}
+:root.light .bg-teal-500\/20 {
+  background-color: rgba(204, 251, 241, 0.8) !important;
+}
+
+/* ── MITRE Inactive Columns ── */
+:root.light .bg-slate-900\/30 {
+  background-color: rgba(248, 250, 252, 0.8) !important;
+}
+:root.light .border-slate-800\/50 {
+  border-color: rgba(226, 232, 240, 0.8) !important;
+}
+:root.light .text-slate-700 {
+  color: #94a3b8 !important;
+}
+
+/* ── Alert Glow Shadows — soften for light mode ── */
+:root.light .shadow-\[0_0_20px_rgba\(239\,68\,68\,0\.15\)\] {
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1) !important;
+}
+:root.light .shadow-\[0_0_20px_rgba\(245\,158\,11\,0\.15\)\] {
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1) !important;
+}
+:root.light .shadow-\[0_0_20px_rgba\(59\,130\,246\,0\.15\)\] {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1) !important;
+}
+:root.light .shadow-\[0_0_10px_\#ef4444\] {
+  box-shadow: none !important;
+}
+
+/* ── MITRE technique severity card fixes ── */
+:root.light .bg-red-500\/20 {
+  background-color: rgba(254, 226, 226, 0.7) !important;
+}
+:root.light .bg-orange-500\/20 {
+  background-color: rgba(255, 237, 213, 0.7) !important;
+}
+:root.light .bg-amber-500\/20 {
+  background-color: rgba(254, 243, 199, 0.7) !important;
+}
+:root.light .bg-blue-500\/20 {
+  background-color: rgba(219, 234, 254, 0.7) !important;
+}
+:root.light .border-red-500\/50 {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+:root.light .border-orange-500\/50 {
+  border-color: rgba(249, 115, 22, 0.3) !important;
+}
+:root.light .border-amber-500\/50 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+:root.light .border-blue-500\/50 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ── MITRE inner hit counters ── */
+:root.light .border-slate-700\/50 {
+  border-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+/* ── Graph container panel overlay ── */
+:root.light .bg-sh-panel\/30 {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+}
+:root.light .bg-sh-panel\/50 {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+:root.light .bg-sh-panel\/80 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ── KillChain stage ring ── */
+:root.light .ring-slate-900 {
+  --tw-ring-color: #ffffff !important;
+}
+
+/* ── MITRE glow shadow ── */
+:root.light .shadow-\[0_0_15px_rgba\(20\,184\,166\,0\.05\)\] {
+  box-shadow: 0 1px 6px rgba(20, 184, 166, 0.08) !important;
+}
+
+/* ── Dividers ── */
+:root.light .divide-sh-border\/50 > * + * {
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+:root.light .border-sh-border\/50 {
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+/* ── Rose 600 gradient (Kill Chain Impact stage) ── */
+:root.light .from-rose-600\/20 {
+  --tw-gradient-from: rgba(225, 29, 72, 0.08) !important;
+}
+
+/* ── Ensure all text is readable ── */
+:root.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   LIGHT MODE — Override Tailwind dark: prefix classes
+   Tailwind dark: uses @media (prefers-color-scheme: dark)
+   which ignores the app's :root.light toggle. These
+   rules force light backgrounds when the toggle is on.
+   ═══════════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  /* ── Backgrounds ── */
+  :root.light .dark\:bg-slate-800 {
+    background-color: #ffffff !important;
+  }
+  :root.light .dark\:bg-slate-800\/50 {
+    background-color: rgba(241, 245, 249, 0.5) !important;
+  }
+  :root.light .dark\:bg-slate-800\/80 {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+  }
+  :root.light .dark\:bg-slate-900 {
+    background-color: #f1f5f9 !important;
+  }
+  :root.light .dark\:bg-slate-900\/40 {
+    background-color: rgba(248, 250, 252, 0.6) !important;
+  }
+  :root.light .dark\:bg-slate-900\/50 {
+    background-color: rgba(248, 250, 252, 0.7) !important;
+  }
+  :root.light .dark\:bg-slate-600 {
+    background-color: #cbd5e1 !important;
+  }
+  :root.light .dark\:bg-slate-700\/30 {
+    background-color: rgba(241, 245, 249, 0.6) !important;
+  }
+  :root.light .dark\:bg-transparent {
+    background-color: transparent !important;
+  }
+  :root.light .dark\:bg-red-500\/10 {
+    background-color: rgba(254, 226, 226, 0.6) !important;
+  }
+
+  /* ── Borders ── */
+  :root.light .dark\:border-red-500\/20 {
+    border-color: rgba(220, 38, 38, 0.2) !important;
+  }
+  :root.light .dark\:border-slate-700\/50 {
+    border-color: rgba(226, 232, 240, 0.6) !important;
+  }
+  :root.light .dark\:border-slate-700 {
+    border-color: #e2e8f0 !important;
+  }
+
+  /* ── Text ── */
+  :root.light .dark\:text-slate-200 {
+    color: #1e293b !important;
+  }
+  :root.light .dark\:text-slate-300 {
+    color: #334155 !important;
+  }
+  :root.light .dark\:text-slate-400 {
+    color: #64748b !important;
+  }
+  :root.light .dark\:text-slate-500 {
+    color: #94a3b8 !important;
+  }
+  :root.light .dark\:text-white {
+    color: #0f172a !important;
+  }
+  :root.light .dark\:text-red-400 {
+    color: #dc2626 !important;
+  }
+  :root.light .dark\:text-blue-400 {
+    color: #2563eb !important;
+  }
+
+  /* ── Hovers ── */
+  :root.light .dark\:hover\:bg-slate-800\/50:hover {
+    background-color: rgba(241, 245, 249, 0.7) !important;
+  }
+  :root.light .dark\:hover\:bg-slate-700\/30:hover {
+    background-color: rgba(241, 245, 249, 0.8) !important;
+  }
+  :root.light .dark\:hover\:border-slate-700\/50:hover {
+    border-color: rgba(203, 213, 225, 0.6) !important;
+  }
+  :root.light .dark\:group-hover\:text-blue-400:hover {
+    color: #2563eb !important;
+  }
+
+  /* ── Ring ── */
+  :root.light .dark\:ring-slate-900 {
+    --tw-ring-color: #ffffff !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
    THEME TOGGLE BUTTON
    ═══════════════════════════════════════════════════ */
 .theme-toggle {
@@ -467,3 +721,4 @@ canvas,
     0 0 10px rgba(251, 191, 36, 0.45),
     inset 0 0 4px rgba(255, 255, 255, 0.3);
 }
+
